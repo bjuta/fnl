@@ -728,6 +728,7 @@ final class Waki_Charts {
                 'playlist_multi'   => ($source==='playlists') ? wp_kses_post($_POST['chart_playlists'] ?? '') : '',
                 'playlist_weights' => ($source==='playlists') ? sanitize_text_field($_POST['chart_weights'] ?? '') : '',
                 'fallback_playlists' => ($source==='playlists') ? wp_kses_post($_POST['chart_fallback_playlists'] ?? '') : '',
+                'fallback_weights'   => ($source==='playlists') ? sanitize_text_field($_POST['chart_fallback_weights'] ?? '') : '',
                 // release-window mode
                 'release_from'     => ($source==='release_window') ? $this->safe_date($_POST['chart_from'] ?? '') : '',
                 'release_to'       => ($source==='release_window') ? $this->safe_date($_POST['chart_to'] ?? '')   : '',
@@ -762,6 +763,7 @@ final class Waki_Charts {
             'pl'     => $editing['playlist_multi']   ?? '',
             'wt'     => $editing['playlist_weights'] ?? '',
             'fbpl'   => $editing['fallback_playlists'] ?? '',
+            'fbwt'   => $editing['fallback_weights'] ?? '',
             'from'   => $editing['release_from']     ?? '',
             'to'     => $editing['release_to']       ?? '',
             'of'     => $editing['origin_filter']    ?? '',
@@ -778,6 +780,8 @@ final class Waki_Charts {
 
         $weights_preview = $this->parse_weights_map($fv['wt']);
         $weights_err     = $this->validate_weights_syntax($fv['wt'], $this->normalize_many($fv['pl']));
+        $fb_weights_preview = $this->parse_weights_map($fv['fbwt']);
+        $fb_weights_err     = $this->validate_weights_syntax($fv['fbwt'], $this->normalize_many($fv['fbpl']));
         ?>
         <div class="wrap">
           <h1>WAKILISHA — Charts</h1>
@@ -852,6 +856,17 @@ final class Waki_Charts {
               <table class="form-table">
                 <tr class="row-pl"><th>Playlists (one per line)</th><td><textarea name="chart_playlists" rows="5" class="large-text" placeholder="37i9dQZF1DWZdKbfDnTWVN&#10;37i9dQZF1DWYkaDif7Ztbp"><?php echo esc_textarea($fv['pl']);?></textarea><div class="waki-help">Each line: playlist ID, platform URI, or open URL.</div></td></tr>
                 <tr class="row-pl"><th>Fallback Playlists</th><td><textarea name="chart_fallback_playlists" rows="3" class="large-text" placeholder="37i9dQZF1DX4Wsb4d7NKfP"><?php echo esc_textarea($fv['fbpl']);?></textarea><div class="waki-help">Used if primary playlists yield too few tracks or invalid positions.</div></td></tr>
+                <tr class="row-pl"><th>Fallback weights</th>
+                  <td>
+                    <input name="chart_fallback_weights" class="regular-text" value="<?php echo esc_attr($fv['fbwt']);?>" placeholder="ID1=1.0,ID2=0.5">
+                    <?php if($fb_weights_err): ?><div class="waki-inline-err">Weights syntax: <?php echo esc_html($fb_weights_err);?></div><?php endif; ?>
+                    <?php if($fb_weights_preview): ?>
+                      <div class="waki-pills" style="margin-top:6px">
+                        <?php foreach($fb_weights_preview as $pid=>$w){ echo '<span class="waki-pill">'.esc_html($pid).' = '.esc_html($w).'</span>'; } ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
+                </tr>
                 <tr class="row-pl"><th>Per-playlist weights</th>
                   <td>
                     <input name="chart_weights" class="regular-text" value="<?php echo esc_attr($fv['wt']);?>" placeholder="ID1=1.2,ID2=0.8">
@@ -1795,6 +1810,7 @@ endif; ?>
                     'playlist_multi'=>'',
                     'playlist_weights'=>'',
                     'fallback_playlists'=>'',
+                    'fallback_weights'=>'',
                     'chart_date'=>'',
                     'chart_limit'=>100,
                     'auto_make_post'=>$opts['auto_make_post'] ?: '1',
@@ -1895,6 +1911,14 @@ endif; ?>
         set_transient('waki_chart_access_token',$token,$ttl);
         return $token;
     }
+    private function compat_sleep($seconds){
+        if(function_exists('wp_sleep')) wp_sleep($seconds);
+        else{
+            $seconds = (float) $seconds;
+            if($seconds > floor($seconds)) usleep((int) round($seconds * 1e6));
+            else sleep((int) $seconds);
+        }
+    }
     private function api_request($method,$url,$query=[],$retry=3){
         $token = $this->get_access_token(); if(is_wp_error($token)) return $token;
         if(!empty($query)){ $qs = http_build_query($query); $url .= (strpos($url,'?')===false?'?':'&').$qs; }
@@ -1909,13 +1933,13 @@ endif; ?>
                     add_action('admin_notices',function() use ($res){ echo '<div class="error"><p>'.sprintf(esc_html__('Spotify API request failed: %s', 'wakilisha-charts'), esc_html($res->get_error_message())).'</p></div>'; });
                     return $res;
                 }
-                wp_sleep(1); continue;
+                $this->compat_sleep(1); continue;
             }
             $code = wp_remote_retrieve_response_code($res);
             $body_raw = wp_remote_retrieve_body($res);
             $body = json_decode($body_raw,true);
 
-            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); wp_sleep(max(1,$ra)); continue; }
+            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); $this->compat_sleep(max(1,$ra)); continue; }
             if ($code==401 && $attempts<$retry){ delete_transient('waki_chart_access_token'); $token=$this->get_access_token(); if(is_wp_error($token)) return $token; $args['headers']['Authorization']='Bearer '.$token; continue; }
             if ($code>=200 && $code<300) return is_array($body) ? $body : [];
             error_log('[WAKI Charts] API error: '.$url.' — '.$code.' — '.substr((string)$body_raw,0,300));
@@ -2346,6 +2370,7 @@ endif; ?>
 
         $all_by_tid=[];
         $weights = $this->parse_weights_map($chart_conf['playlist_weights'] ?? '');
+        $weights = array_replace($weights, $this->parse_weights_map($chart_conf['fallback_weights'] ?? ''));
         $origin_filter = $this->valid_iso($chart_conf['origin_filter'] ?? '');
         $fallback_ids = ($source_type === 'playlists') ? $this->normalize_many($chart_conf['fallback_playlists'] ?? '') : [];
         $used_fallback = false;
@@ -3102,7 +3127,9 @@ endif; ?>
         $state_log[] = 'Inspecting sources';
         $market = strtoupper($chart_conf['market']);
         $weights = $this->parse_weights_map($chart_conf['playlist_weights'] ?? '');
+        $weights = array_replace($weights, $this->parse_weights_map($chart_conf['fallback_weights'] ?? ''));
         $weights_err = $this->validate_weights_syntax($chart_conf['playlist_weights'] ?? '', $this->normalize_many($chart_conf['playlist_multi'] ?? ''));
+        $fb_weights_err = $this->validate_weights_syntax($chart_conf['fallback_weights'] ?? '', $this->normalize_many($chart_conf['fallback_playlists'] ?? ''));
 
         $playlist_checks = [];
         $all_items = [];
@@ -3208,6 +3235,7 @@ endif; ?>
             'limit'   => $limitWanted,
         ];
         if($weights_err){ $rules['weights_error'] = $weights_err; }
+        if($fb_weights_err){ $rules['fallback_weights_error'] = $fb_weights_err; }
 
         $counts = [
             'Total items gathered' => $total_gathered,
