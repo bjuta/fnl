@@ -1570,16 +1570,19 @@ endif; ?>
             $status = ['total'=>0,'processed'=>0,'errors'=>[], 'completed'=>false];
         }
         $batch = array_splice($queue, 0, 10);
+
+        // Bulk fetch general artist metadata once for the batch
+        $meta_map = $batch ? $this->fetch_artists_meta($batch) : [];
+        if(!is_wp_error($meta_map)){
+            foreach($meta_map as $meta){ $this->upsert_artist_meta($meta); }
+        }
+
         foreach ($batch as $id){
             $spotify = $this->fetch_spotify_data($id);
             $youtube = $this->fetch_youtube_videos($id);
             $data = [];
             if(is_array($spotify)){
                 if(isset($spotify['biography'])) $data['biography'] = $spotify['biography'];
-                if(isset($spotify['latest_release'])) $data['latest_release'] = $spotify['latest_release'];
-                if(!empty($spotify['top_tracks'])) $data['top_tracks'] = implode(',', (array)$spotify['top_tracks']);
-                if(!empty($spotify['discography'])) $data['discography'] = wp_json_encode($spotify['discography']);
-                if(!empty($spotify['chart_stats'])) $data['chart_stats'] = wp_json_encode($spotify['chart_stats']);
                 if(!empty($spotify['related_artist_ids'])) $data['related_artist_ids'] = implode(',', (array)$spotify['related_artist_ids']);
             }
             if(is_array($youtube) && !empty($youtube['video_urls'])){
@@ -1602,27 +1605,25 @@ endif; ?>
     }
 
     private function fetch_spotify_data($artist_id){
+        static $cache = [];
+        if(isset($cache[$artist_id])) return $cache[$artist_id];
         $cache_key = 'waki_spotify_'.$artist_id;
         $cached = get_transient($cache_key);
-        if($cached !== false) return $cached;
+        if($cached !== false){
+            $cache[$artist_id] = $cached;
+            return $cached;
+        }
         $data = [];
         $artist = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id));
         if(!is_wp_error($artist)){
             $data['biography'] = $artist['bio'] ?? $artist['biography'] ?? '';
-            $albums = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/albums', ['limit'=>1,'include_groups'=>'album,single']);
-            if(!is_wp_error($albums) && !empty($albums['items'][0])){
-                $data['latest_release'] = $albums['items'][0]['name'] ?? '';
-            }
-            $top = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/top-tracks', ['market'=>'US']);
-            if(!is_wp_error($top)){
-                $data['top_tracks'] = array_map(fn($t)=>$t['id'], $top['tracks'] ?? []);
-            }
             $related = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/related-artists');
             if(!is_wp_error($related)){
                 $data['related_artist_ids'] = array_map(fn($a)=>$a['id'], $related['artists'] ?? []);
             }
         }
         set_transient($cache_key, $data, DAY_IN_SECONDS);
+        $cache[$artist_id] = $data;
         return $data;
     }
 
@@ -2172,8 +2173,23 @@ endif; ?>
     private function fetch_artists_meta($artist_ids){
         $ids = array_values(array_unique(array_filter((array)$artist_ids)));
         if(!$ids) return [];
+
+        static $cache = [];
         $out = [];
-        foreach(array_chunk($ids, 50) as $chunk){
+        $fetch = [];
+        foreach($ids as $id){
+            if(isset($cache[$id])){ $out[$id] = $cache[$id]; continue; }
+            $ckey = 'waki_meta_'.$id;
+            $cached = get_transient($ckey);
+            if($cached !== false){
+                $cache[$id] = $cached;
+                $out[$id] = $cached;
+            } else {
+                $fetch[] = $id;
+            }
+        }
+
+        foreach(array_chunk($fetch, 50) as $chunk){
             $data = $this->api_request('GET', $this->api_base().'/v1/artists', ['ids'=>implode(',',$chunk)]);
             if(is_wp_error($data)) return $data;
             foreach(($data['artists'] ?? []) as $a){
@@ -2187,7 +2203,7 @@ endif; ?>
                     $img = $a['images'][0]['url'] ?? '';
                 }
                 $bio = $a['bio'] ?? $a['biography'] ?? ($a['profile']['biography']['text'] ?? '');
-                $out[$id] = [
+                $meta = [
                     'artist_id'   => $id,
                     'artist_name' => $name,
                     'genres'      => $genres,
@@ -2197,6 +2213,9 @@ endif; ?>
                     'profile_url' => $a['external_urls']['spotify'] ?? '',
                     'biography'   => is_string($bio) ? $bio : '',
                 ];
+                $out[$id] = $meta;
+                $cache[$id] = $meta;
+                set_transient('waki_meta_'.$id, $meta, DAY_IN_SECONDS);
             }
         }
         return $out;
