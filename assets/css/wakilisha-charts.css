@@ -93,6 +93,9 @@ body.single-chart nav{margin-top:0}
 .waki-mini-btn{margin-top:10px;border:1px solid #84c241;background:#84c241;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .waki-mini-btn .chev{transition:transform .2s}
 .waki-mini-btn.open .chev{transform:rotate(180deg)}
+.waki-load-wrap{text-align:center;margin:10px 0}
+.waki-load-more{border:1px solid #84c241;background:#84c241;color:#fff;border-radius:6px;padding:8px 16px;cursor:pointer}
+.waki-load-more:hover{background:#6ca32f;border-color:#6ca32f}
 .waki-hist-mini{margin-top:10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px}
 .waki-spark-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px dashed #e5e7eb;border-radius:6px;padding:6px}
 .waki-spark{display:block}
