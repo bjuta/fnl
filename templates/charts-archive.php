@@ -2,7 +2,8 @@
           <div class="waki-archive-hero"<?php if($hero_img) echo ' style="--hero:url(\''.$hero_img.'\')"'; ?>>
             <div class="waki-hero-inner">
               <h1 class="waki-hero-title"><?php esc_html_e('WAKILISHA Charts', 'wakilisha-charts'); ?></h1>
-              <p class="waki-hero-sub"><?php esc_html_e('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by region and genre, and more.', 'wakilisha-charts'); ?></p>
+              <?php $intro = get_option(Waki_Charts::ARCHIVE_INTRO, $this->default_archive_intro()); ?>
+              <p class="waki-hero-sub"><?php echo esc_html($intro); ?></p>
             </div>
           </div>
         </template>

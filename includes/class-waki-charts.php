@@ -9,6 +9,7 @@ final class Waki_Charts {
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
     const VER        = '2.3';
+    const ARCHIVE_INTRO = 'waki_archive_intro';
 
     // CPT
     const CPT        = 'wakilisha_chart';
@@ -39,6 +40,7 @@ final class Waki_Charts {
         add_action('admin_init',             [$this,'handle_charts_actions']);
         add_action('admin_init',             [$this,'handle_artist_actions']);
         add_action('admin_init',             [$this,'handle_dry_run_action']);
+        add_action('rest_api_init',         [$this,'register_rest_routes']);
 
         add_action(self::CRON_HOOK,          [$this,'cron_run_all_charts']);
 
@@ -70,6 +72,7 @@ final class Waki_Charts {
         $this->reset_archive_page();
         $this->register_cpt();
         flush_rewrite_rules();
+        add_option(self::ARCHIVE_INTRO, $this->default_archive_intro());
         update_option(self::SLUG . '_ver', self::VER);
     }
     public function deactivate(){
@@ -3256,6 +3259,44 @@ endif; ?>
             'top_preview'=>$top_preview,
             'dedupe_sample'=>$dedupe_sample
         ];
+    }
+
+    private function default_archive_intro(){
+        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by region and genre, and more.', 'wakilisha-charts');
+    }
+
+    public function register_rest_routes(){
+        register_rest_route('wakicharts/v1', '/archive-intro', [
+            [
+                'methods'  => WP_REST_Server::READABLE,
+                'callback' => [$this, 'rest_get_archive_intro'],
+                'permission_callback' => '__return_true',
+            ],
+            [
+                'methods'  => WP_REST_Server::EDITABLE,
+                'callback' => [$this, 'rest_update_archive_intro'],
+                'permission_callback' => function(){ return current_user_can('manage_options'); },
+                'args'     => [
+                    'intro' => [
+                        'type' => 'string',
+                        'required' => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    public function rest_get_archive_intro($request){
+        return rest_ensure_response([
+            'intro' => get_option(self::ARCHIVE_INTRO, $this->default_archive_intro())
+        ]);
+    }
+
+    public function rest_update_archive_intro($request){
+        $intro = $request->get_param('intro');
+        update_option(self::ARCHIVE_INTRO, $intro);
+        return rest_ensure_response(['intro' => $intro]);
     }
 
 }
