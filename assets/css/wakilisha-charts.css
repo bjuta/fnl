@@ -35,10 +35,14 @@ body.single-chart nav{margin-top:0}
 .waki-chart-hero .waki-hero-title,
 .waki-chart-hero .waki-hero-sub,
 .waki-chart-hero .waki-hero-meta,
-.waki-chart-hero .waki-hero-meta .waki-chip,
 .waki-archive-hero .waki-hero-title,
 .waki-archive-hero .waki-hero-sub{
   text-shadow:0 2px 4px rgba(0,0,0,.8);
+}
+
+.waki-chart-hero .waki-hero-meta .waki-chip,
+.waki-archive-hero .waki-hero-meta .waki-chip{
+  text-shadow:none;
 }
 .waki-hero-title{margin:0 0 6px; color:#fff;}
 .waki-hero-sub{opacity:.85; margin-bottom:12px;}

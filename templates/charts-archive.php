@@ -18,10 +18,17 @@
                 <?php
                   $cid   = get_the_ID();
                   $key   = get_post_meta($cid,'_waki_chart_key',true);
-                  $cover = get_post_meta($cid,'_waki_cover_url',true);
+                  $date  = get_post_meta($cid,'_waki_chart_date',true);
+                  $sid   = get_post_meta($cid,'_waki_snapshot_id',true);
+                  $rows  = $this->get_chart_rows($key,$date,10,$sid);
+                  $imgs  = array_filter(array_column($rows,'album_image_url'));
+                  $cover = $imgs ? $imgs[array_rand($imgs)] : '';
                   if(!$cover){
-                    $thumb = get_the_post_thumbnail_url(null,'large');
-                    if($thumb) $cover = $thumb;
+                    $cover = get_post_meta($cid,'_waki_cover_url',true);
+                    if(!$cover){
+                      $thumb = get_the_post_thumbnail_url(null,'large');
+                      if($thumb) $cover = $thumb;
+                    }
                   }
 
                   $country = '';
