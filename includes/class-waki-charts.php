@@ -1,4 +1,3 @@
-
 <?php
 if (!defined('ABSPATH')) exit;
 final class Waki_Charts {
@@ -10,7 +9,7 @@ final class Waki_Charts {
     const TZ         = 'Africa/Nairobi';
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
-    const VER        = '2.3';
+    const VER        = '3.0';
     const ARCHIVE_INTRO = 'waki_archive_intro';
 
     // CPT
@@ -601,7 +600,10 @@ final class Waki_Charts {
             $opts['post_category']   = sanitize_text_field($_POST['post_category'] ?? 'Charts');
             $opts['archive_hero_img']= esc_url_raw($_POST['archive_hero_img'] ?? '');
             $opts['hero_img_size']   = sanitize_key($_POST['hero_img_size'] ?? 'full');
-            update_option(self::OPTS,$opts); $saved=true;
+            $intro                   = sanitize_textarea_field($_POST['archive_intro'] ?? '');
+            update_option(self::OPTS,$opts);
+            update_option(self::ARCHIVE_INTRO, $intro);
+            $saved=true;
         }
 
         if (!empty($_POST[self::SLUG.'_purge'])){
@@ -664,10 +666,18 @@ final class Waki_Charts {
             <h2><?php esc_html_e('Archive', 'wakilisha-charts'); ?></h2>
             <table class="form-table">
               <tr>
+                <th><?php esc_html_e('Intro Text', 'wakilisha-charts'); ?></th>
+                <td>
+                  <?php $intro = get_option(self::ARCHIVE_INTRO, $this->default_archive_intro()); ?>
+                  <textarea name="archive_intro" class="large-text" rows="3"><?php echo esc_textarea($intro); ?></textarea>
+                </td>
+              </tr>
+              <tr>
                 <th><?php esc_html_e('Archive Hero Image', 'wakilisha-charts'); ?></th>
                 <td>
                   <input id="waki_archive_hero_img" class="regular-text" name="archive_hero_img" value="<?php echo esc_attr($opts['archive_hero_img']);?>">
                   <button class="button waki-upload-hero"><?php esc_html_e('Select Image', 'wakilisha-charts'); ?></button>
+                  <p class="description"><?php esc_html_e('Use a 16:9 image to fill the hero area.', 'wakilisha-charts'); ?></p>
                 </td>
               </tr>
               <tr>
