@@ -6,6 +6,9 @@ final class Waki_Charts {
     const CHARTS     = 'waki_charts';
     const CRON_HOOK  = 'waki_chart_ingest_daily';
     const RETRY_HOOK = 'waki_chart_api_retry';
+    const ARTIST_API_HOOK  = 'waki_artist_api_batch';
+    const ARTIST_API_QUEUE = 'waki_artist_api_queue';
+    const ARTIST_API_STATUS = 'waki_artist_api_status';
     const TZ         = 'Africa/Nairobi';
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
@@ -45,6 +48,7 @@ final class Waki_Charts {
 
         add_action(self::CRON_HOOK,          [$this,'cron_run_all_charts']);
         add_action(self::RETRY_HOOK,         [$this,'resume_api_request']);
+        add_action(self::ARTIST_API_HOOK,    [$this,'process_artist_api_queue']);
 
         // Auto enqueue on CPT single/archive or shortcodes
         add_action('wp',                     [$this,'maybe_enqueue_assets']);
@@ -82,6 +86,7 @@ final class Waki_Charts {
     }
     public function deactivate(){
         wp_clear_scheduled_hook(self::CRON_HOOK);
+        wp_clear_scheduled_hook(self::ARTIST_API_HOOK);
         flush_rewrite_rules();
     }
 
@@ -1135,7 +1140,19 @@ endif; ?>
         // Fetch from external APIs for enriched fields
         if (!empty($_GET['fetch_api']) && check_admin_referer(self::SLUG.'_fetch_api')){
             $n = $this->fetch_api_for_all_artists();
-            $notice = 'Fetched API data for '.intval($n).' artists.';
+            $notice = 'Queued API fetch for '.intval($n).' artists. Processing in background.';
+        }
+
+        $status = get_transient(self::ARTIST_API_STATUS);
+        if ($status && !empty($status['total'])) {
+            $progress = sprintf('API fetch progress: %d/%d processed.', intval($status['processed']), intval($status['total']));
+            if (!empty($status['errors'])) {
+                $progress .= ' Errors for IDs: '.implode(',', array_map('strval', (array)$status['errors']));
+            }
+            if (!get_transient(self::ARTIST_API_QUEUE)) {
+                $progress .= ' Completed.';
+            }
+            $notice = $notice ? $notice.' '.$progress : $progress;
         }
 
         // Pagination
@@ -1533,8 +1550,27 @@ endif; ?>
     private function fetch_api_for_all_artists(){
         global $wpdb;
         $ids = $wpdb->get_col("SELECT artist_id FROM {$this->artist_table} WHERE status<>'trash'");
-        $count = 0;
-        foreach($ids as $id){
+        set_transient(self::ARTIST_API_QUEUE, $ids, DAY_IN_SECONDS);
+        set_transient(self::ARTIST_API_STATUS, [
+            'total'     => count($ids),
+            'processed' => 0,
+            'errors'    => [],
+            'completed' => false,
+        ], DAY_IN_SECONDS);
+        wp_schedule_single_event(time()+1, self::ARTIST_API_HOOK);
+        return count($ids);
+    }
+
+    public function process_artist_api_queue(){
+        global $wpdb;
+        $queue = get_transient(self::ARTIST_API_QUEUE);
+        if (!$queue || !is_array($queue)) return;
+        $status = get_transient(self::ARTIST_API_STATUS);
+        if (!is_array($status)) {
+            $status = ['total'=>0,'processed'=>0,'errors'=>[], 'completed'=>false];
+        }
+        $batch = array_splice($queue, 0, 10);
+        foreach ($batch as $id){
             $spotify = $this->fetch_spotify_data($id);
             $youtube = $this->fetch_youtube_videos($id);
             $data = [];
@@ -1552,10 +1588,17 @@ endif; ?>
             if($data){
                 $data['updated_at'] = current_time('mysql',1);
                 $wpdb->update($this->artist_table, $data, ['artist_id'=>$id]);
-                $count++;
+            } else {
+                $status['errors'][] = $id;
             }
+            $status['processed']++;
         }
-        return $count;
+        set_transient(self::ARTIST_API_QUEUE, $queue, DAY_IN_SECONDS);
+        $status['completed'] = empty($queue);
+        set_transient(self::ARTIST_API_STATUS, $status, DAY_IN_SECONDS);
+        if (!empty($queue)) {
+            wp_schedule_single_event(time()+60, self::ARTIST_API_HOOK);
+        }
     }
 
     private function fetch_spotify_data($artist_id){
