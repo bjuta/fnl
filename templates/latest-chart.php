@@ -33,10 +33,21 @@
             $firstList = true;
             foreach($dates as $d):
               $rows = $this->get_chart_rows($chart_key,$d, $limit, ($d===$first_date)?$sid:'');
-              if (!$rows) continue; ?>
+              if (!$rows) continue;
+              $chunks = array_chunk($rows, 10);
+              ?>
               <div class="waki-list" data-for-date="<?php echo esc_attr($d); ?>" style="<?php echo $firstList?'':'display:none'; ?>">
-                <?php foreach($rows as $i=>$r){
-                    echo $this->render_entry_row($r, $chart_key, $d);
+                <?php foreach($chunks as $ci => $chunk){
+                    $hidden = $ci === 0 ? '' : 'style="display:none"';
+                    echo '<div class="waki-chunk" '.$hidden.'>';
+                    foreach($chunk as $r){
+                        echo $this->render_entry_row($r, $chart_key, $d);
+                    }
+                    echo '</div>';
+                    if($ci < count($chunks)-1){
+                        $btn_style = $ci === 0 ? '' : 'style="display:none"';
+                        echo '<div class="waki-load-wrap" '.$btn_style.'><button class="waki-load-more">'.esc_html__('Load more', 'wakilisha-charts').'</button></div>';
+                    }
                 } ?>
               </div>
             <?php $firstList=false; endforeach; ?>
