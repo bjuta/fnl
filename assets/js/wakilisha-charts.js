@@ -52,6 +52,21 @@ document.addEventListener('click',function(e){
   });
 });
 
+// Load more tracks (10 at a time)
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.waki-load-more'); if(!btn) return;
+  const wrap = btn.closest('.waki-load-wrap'); if(!wrap) return;
+  const nextChunk = wrap.nextElementSibling;
+  if(nextChunk && nextChunk.classList.contains('waki-chunk')){
+    nextChunk.style.display = '';
+    wrap.style.display = 'none';
+    const nextWrap = nextChunk.nextElementSibling;
+    if(nextWrap && nextWrap.classList.contains('waki-load-wrap')){
+      nextWrap.style.display = '';
+    }
+  }
+});
+
 // Toggle mini history
 document.addEventListener('click',function(e){
   const b = e.target.closest('[data-show-history]'); if(!b) return;
