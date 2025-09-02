@@ -1869,6 +1869,7 @@ endif; ?>
             error_log('[WAKI Charts] Missing Client ID/secret for authentication');
             return new WP_Error('missing_creds',__('Client ID/secret not configured.', 'wakilisha-charts'));
         }
+        if(!$this->maybe_throttle()) return new WP_Error('throttle','Rate limited');
         $res = wp_remote_post(self::AUTH_URL, [
             'headers'=>[
                 'Authorization'=>'Basic '.base64_encode($opts['client_id'].':'.$opts['client_secret']),
@@ -1885,6 +1886,11 @@ endif; ?>
         $code = wp_remote_retrieve_response_code($res);
         $body_raw = wp_remote_retrieve_body($res);
         $body = json_decode($body_raw, true);
+        if ($code==429){
+            $ra=intval(wp_remote_retrieve_header($res,'retry-after'));
+            $this->maybe_throttle(max(1,$ra));
+            return new WP_Error('throttle','Rate limited');
+        }
         if ($code!==200 || empty($body['access_token'])){
             error_log('[WAKI Charts] Auth failed: '.self::AUTH_URL.' — '.$code.' — '.substr((string)$body_raw,0,300));
             add_action('admin_notices',function(){ echo '<div class="error"><p>'.esc_html__('Authentication with Spotify failed.', 'wakilisha-charts').'</p></div>'; });
@@ -1895,13 +1901,38 @@ endif; ?>
         set_transient('waki_chart_access_token',$token,$ttl);
         return $token;
     }
-    private function compat_sleep($seconds){
-        if(function_exists('wp_sleep')) wp_sleep($seconds);
-        else{
-            $seconds = (float) $seconds;
-            if($seconds > floor($seconds)) usleep((int) round($seconds * 1e6));
-            else sleep((int) $seconds);
+    private function maybe_throttle($retry_after = 0){
+        $bucket = get_transient('waki_chart_tokens');
+        $now    = time();
+        $capacity = 10; // max tokens
+        $rate     = 10; // refill rate per second
+
+        if(!is_array($bucket)){
+            $bucket = ['tokens' => $capacity, 'ts' => $now];
+        }else{
+            $elapsed = $now - intval($bucket['ts']);
+            if($elapsed > 0){
+                $bucket['tokens'] = min($capacity, $bucket['tokens'] + $elapsed * $rate);
+                $bucket['ts']     = $now;
+            }
         }
+
+        if($retry_after > 0){
+            $bucket['tokens'] = 0;
+            set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
+            wp_schedule_single_event(time() + max(1, intval($retry_after)), self::CRON_HOOK);
+            return false;
+        }
+
+        if($bucket['tokens'] < 1){
+            set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
+            wp_schedule_single_event(time() + 1, self::CRON_HOOK);
+            return false;
+        }
+
+        $bucket['tokens'] -= 1;
+        set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
+        return true;
     }
     private function api_request($method,$url,$query=[],$retry=3){
         $token = $this->get_access_token(); if(is_wp_error($token)) return $token;
@@ -1910,6 +1941,7 @@ endif; ?>
         $attempts=0;
         while($attempts<$retry){
             $attempts++;
+            if(!$this->maybe_throttle()) return new WP_Error('throttle','Rate limited');
             $res = wp_remote_request($url,$args);
             if(is_wp_error($res)){
                 if($attempts>=$retry){
@@ -1917,13 +1949,14 @@ endif; ?>
                     add_action('admin_notices',function() use ($res){ echo '<div class="error"><p>'.sprintf(esc_html__('Spotify API request failed: %s', 'wakilisha-charts'), esc_html($res->get_error_message())).'</p></div>'; });
                     return $res;
                 }
-                $this->compat_sleep(1); continue;
+                $this->maybe_throttle(1);
+                return new WP_Error('throttle','Temporary request failure');
             }
             $code = wp_remote_retrieve_response_code($res);
             $body_raw = wp_remote_retrieve_body($res);
             $body = json_decode($body_raw,true);
 
-            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); $this->compat_sleep(max(1,$ra)); continue; }
+            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); $this->maybe_throttle(max(1,$ra)); return new WP_Error('throttle','Rate limited'); }
             if ($code==401 && $attempts<$retry){ delete_transient('waki_chart_access_token'); $token=$this->get_access_token(); if(is_wp_error($token)) return $token; $args['headers']['Authorization']='Bearer '.$token; continue; }
             if ($code>=200 && $code<300) return is_array($body) ? $body : [];
             error_log('[WAKI Charts] API error: '.$url.' — '.$code.' — '.substr((string)$body_raw,0,300));
