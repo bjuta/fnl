@@ -2955,7 +2955,7 @@ endif; ?>
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/artist-profile.php';
-        return ob_get_clean();
+        return ltrim(ob_get_clean());
     }
 
     public function force_single_content($content){
@@ -3043,7 +3043,7 @@ endif; ?>
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/latest-chart.php';
-        return ob_get_clean();
+        return ltrim(ob_get_clean());
     }
 
     /* ===== Shortcode: Archive ===== */
@@ -3079,7 +3079,7 @@ endif; ?>
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/charts-archive.php';
-        return ob_get_clean();
+        return ltrim(ob_get_clean());
     }
 
     /* ===== Entry rendering with NEW tag rule + interactive history ===== */
@@ -3118,7 +3118,7 @@ endif; ?>
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/history-mini.php';
-        return ob_get_clean();
+        return ltrim(ob_get_clean());
     }
 
     private function render_entry_row($r, $chart_key, $chart_date){
@@ -3209,7 +3209,7 @@ endif; ?>
           </div>
         </details>
         <?php
-        return ob_get_clean();
+        return ltrim(ob_get_clean());
     }
 
     /* ===== Dry Run core ===== */
