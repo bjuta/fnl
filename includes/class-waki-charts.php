@@ -1,3 +1,4 @@
+
 <?php
 if (!defined('ABSPATH')) exit;
 final class Waki_Charts {
@@ -6,13 +7,11 @@ final class Waki_Charts {
     const CHARTS     = 'waki_charts';
     const CRON_HOOK  = 'waki_chart_ingest_daily';
     const RETRY_HOOK = 'waki_chart_api_retry';
-    const ARTIST_API_HOOK  = 'waki_artist_api_batch';
-    const ARTIST_API_QUEUE = 'waki_artist_api_queue';
-    const ARTIST_API_STATUS = 'waki_artist_api_status';
     const TZ         = 'Africa/Nairobi';
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
     const VER        = '2.3';
+    const ARCHIVE_INTRO = 'waki_archive_intro';
 
     // CPT
     const CPT        = 'wakilisha_chart';
@@ -45,10 +44,10 @@ final class Waki_Charts {
         add_action('admin_init',             [$this,'handle_artist_actions']);
         add_action('admin_init',             [$this,'handle_dry_run_action']);
         add_action('admin_init',             [$this,'handle_archive_reset_action']);
+        add_action('rest_api_init',         [$this,'register_rest_routes']);
 
         add_action(self::CRON_HOOK,          [$this,'cron_run_all_charts']);
         add_action(self::RETRY_HOOK,         [$this,'resume_api_request']);
-        add_action(self::ARTIST_API_HOOK,    [$this,'process_artist_api_queue']);
 
         // Auto enqueue on CPT single/archive or shortcodes
         add_action('wp',                     [$this,'maybe_enqueue_assets']);
@@ -82,11 +81,11 @@ final class Waki_Charts {
         $this->ensure_archive_page();
         $this->register_cpt();
         flush_rewrite_rules();
+        add_option(self::ARCHIVE_INTRO, $this->default_archive_intro());
         update_option(self::SLUG . '_ver', self::VER);
     }
     public function deactivate(){
         wp_clear_scheduled_hook(self::CRON_HOOK);
-        wp_clear_scheduled_hook(self::ARTIST_API_HOOK);
         flush_rewrite_rules();
     }
 
@@ -779,6 +778,7 @@ final class Waki_Charts {
                 'playlist_multi'   => ($source==='playlists') ? wp_kses_post($_POST['chart_playlists'] ?? '') : '',
                 'playlist_weights' => ($source==='playlists') ? sanitize_text_field($_POST['chart_weights'] ?? '') : '',
                 'fallback_playlists' => ($source==='playlists') ? wp_kses_post($_POST['chart_fallback_playlists'] ?? '') : '',
+                'fallback_weights'   => ($source==='playlists') ? sanitize_text_field($_POST['chart_fallback_weights'] ?? '') : '',
                 // release-window mode
                 'release_from'     => ($source==='release_window') ? $this->safe_date($_POST['chart_from'] ?? '') : '',
                 'release_to'       => ($source==='release_window') ? $this->safe_date($_POST['chart_to'] ?? '')   : '',
@@ -813,6 +813,7 @@ final class Waki_Charts {
             'pl'     => $editing['playlist_multi']   ?? '',
             'wt'     => $editing['playlist_weights'] ?? '',
             'fbpl'   => $editing['fallback_playlists'] ?? '',
+            'fbwt'   => $editing['fallback_weights'] ?? '',
             'from'   => $editing['release_from']     ?? '',
             'to'     => $editing['release_to']       ?? '',
             'of'     => $editing['origin_filter']    ?? '',
@@ -829,6 +830,8 @@ final class Waki_Charts {
 
         $weights_preview = $this->parse_weights_map($fv['wt']);
         $weights_err     = $this->validate_weights_syntax($fv['wt'], $this->normalize_many($fv['pl']));
+        $fb_weights_preview = $this->parse_weights_map($fv['fbwt']);
+        $fb_weights_err     = $this->validate_weights_syntax($fv['fbwt'], $this->normalize_many($fv['fbpl']));
         ?>
         <div class="wrap">
           <h1>WAKILISHA — Charts</h1>
@@ -903,6 +906,17 @@ final class Waki_Charts {
               <table class="form-table">
                 <tr class="row-pl"><th>Playlists (one per line)</th><td><textarea name="chart_playlists" rows="5" class="large-text" placeholder="37i9dQZF1DWZdKbfDnTWVN&#10;37i9dQZF1DWYkaDif7Ztbp"><?php echo esc_textarea($fv['pl']);?></textarea><div class="waki-help">Each line: playlist ID, platform URI, or open URL.</div></td></tr>
                 <tr class="row-pl"><th>Fallback Playlists</th><td><textarea name="chart_fallback_playlists" rows="3" class="large-text" placeholder="37i9dQZF1DX4Wsb4d7NKfP"><?php echo esc_textarea($fv['fbpl']);?></textarea><div class="waki-help">Used if primary playlists yield too few tracks or invalid positions.</div></td></tr>
+                <tr class="row-pl"><th>Fallback weights</th>
+                  <td>
+                    <input name="chart_fallback_weights" class="regular-text" value="<?php echo esc_attr($fv['fbwt']);?>" placeholder="ID1=1.0,ID2=0.5">
+                    <?php if($fb_weights_err): ?><div class="waki-inline-err">Weights syntax: <?php echo esc_html($fb_weights_err);?></div><?php endif; ?>
+                    <?php if($fb_weights_preview): ?>
+                      <div class="waki-pills" style="margin-top:6px">
+                        <?php foreach($fb_weights_preview as $pid=>$w){ echo '<span class="waki-pill">'.esc_html($pid).' = '.esc_html($w).'</span>'; } ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
+                </tr>
                 <tr class="row-pl"><th>Per-playlist weights</th>
                   <td>
                     <input name="chart_weights" class="regular-text" value="<?php echo esc_attr($fv['wt']);?>" placeholder="ID1=1.2,ID2=0.8">
@@ -1140,19 +1154,7 @@ endif; ?>
         // Fetch from external APIs for enriched fields
         if (!empty($_GET['fetch_api']) && check_admin_referer(self::SLUG.'_fetch_api')){
             $n = $this->fetch_api_for_all_artists();
-            $notice = 'Queued API fetch for '.intval($n).' artists. Processing in background.';
-        }
-
-        $status = get_transient(self::ARTIST_API_STATUS);
-        if ($status && !empty($status['total'])) {
-            $progress = sprintf('API fetch progress: %d/%d processed.', intval($status['processed']), intval($status['total']));
-            if (!empty($status['errors'])) {
-                $progress .= ' Errors for IDs: '.implode(',', array_map('strval', (array)$status['errors']));
-            }
-            if (!get_transient(self::ARTIST_API_QUEUE)) {
-                $progress .= ' Completed.';
-            }
-            $notice = $notice ? $notice.' '.$progress : $progress;
+            $notice = 'Fetched API data for '.intval($n).' artists.';
         }
 
         // Pagination
@@ -1550,39 +1552,17 @@ endif; ?>
     private function fetch_api_for_all_artists(){
         global $wpdb;
         $ids = $wpdb->get_col("SELECT artist_id FROM {$this->artist_table} WHERE status<>'trash'");
-        set_transient(self::ARTIST_API_QUEUE, $ids, DAY_IN_SECONDS);
-        set_transient(self::ARTIST_API_STATUS, [
-            'total'     => count($ids),
-            'processed' => 0,
-            'errors'    => [],
-            'completed' => false,
-        ], DAY_IN_SECONDS);
-        wp_schedule_single_event(time()+1, self::ARTIST_API_HOOK);
-        return count($ids);
-    }
-
-    public function process_artist_api_queue(){
-        global $wpdb;
-        $queue = get_transient(self::ARTIST_API_QUEUE);
-        if (!$queue || !is_array($queue)) return;
-        $status = get_transient(self::ARTIST_API_STATUS);
-        if (!is_array($status)) {
-            $status = ['total'=>0,'processed'=>0,'errors'=>[], 'completed'=>false];
-        }
-        $batch = array_splice($queue, 0, 10);
-
-        // Bulk fetch general artist metadata once for the batch
-        $meta_map = $batch ? $this->fetch_artists_meta($batch) : [];
-        if(!is_wp_error($meta_map)){
-            foreach($meta_map as $meta){ $this->upsert_artist_meta($meta); }
-        }
-
-        foreach ($batch as $id){
+        $count = 0;
+        foreach($ids as $id){
             $spotify = $this->fetch_spotify_data($id);
             $youtube = $this->fetch_youtube_videos($id);
             $data = [];
             if(is_array($spotify)){
                 if(isset($spotify['biography'])) $data['biography'] = $spotify['biography'];
+                if(isset($spotify['latest_release'])) $data['latest_release'] = $spotify['latest_release'];
+                if(!empty($spotify['top_tracks'])) $data['top_tracks'] = implode(',', (array)$spotify['top_tracks']);
+                if(!empty($spotify['discography'])) $data['discography'] = wp_json_encode($spotify['discography']);
+                if(!empty($spotify['chart_stats'])) $data['chart_stats'] = wp_json_encode($spotify['chart_stats']);
                 if(!empty($spotify['related_artist_ids'])) $data['related_artist_ids'] = implode(',', (array)$spotify['related_artist_ids']);
             }
             if(is_array($youtube) && !empty($youtube['video_urls'])){
@@ -1591,39 +1571,34 @@ endif; ?>
             if($data){
                 $data['updated_at'] = current_time('mysql',1);
                 $wpdb->update($this->artist_table, $data, ['artist_id'=>$id]);
-            } else {
-                $status['errors'][] = $id;
+                $count++;
             }
-            $status['processed']++;
         }
-        set_transient(self::ARTIST_API_QUEUE, $queue, DAY_IN_SECONDS);
-        $status['completed'] = empty($queue);
-        set_transient(self::ARTIST_API_STATUS, $status, DAY_IN_SECONDS);
-        if (!empty($queue)) {
-            wp_schedule_single_event(time()+60, self::ARTIST_API_HOOK);
-        }
+        return $count;
     }
 
     private function fetch_spotify_data($artist_id){
-        static $cache = [];
-        if(isset($cache[$artist_id])) return $cache[$artist_id];
         $cache_key = 'waki_spotify_'.$artist_id;
         $cached = get_transient($cache_key);
-        if($cached !== false){
-            $cache[$artist_id] = $cached;
-            return $cached;
-        }
+        if($cached !== false) return $cached;
         $data = [];
         $artist = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id));
         if(!is_wp_error($artist)){
             $data['biography'] = $artist['bio'] ?? $artist['biography'] ?? '';
+            $albums = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/albums', ['limit'=>1,'include_groups'=>'album,single']);
+            if(!is_wp_error($albums) && !empty($albums['items'][0])){
+                $data['latest_release'] = $albums['items'][0]['name'] ?? '';
+            }
+            $top = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/top-tracks', ['market'=>'US']);
+            if(!is_wp_error($top)){
+                $data['top_tracks'] = array_map(fn($t)=>$t['id'], $top['tracks'] ?? []);
+            }
             $related = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($artist_id).'/related-artists');
             if(!is_wp_error($related)){
                 $data['related_artist_ids'] = array_map(fn($a)=>$a['id'], $related['artists'] ?? []);
             }
         }
         set_transient($cache_key, $data, DAY_IN_SECONDS);
-        $cache[$artist_id] = $data;
         return $data;
     }
 
@@ -1885,6 +1860,7 @@ endif; ?>
                     'playlist_multi'=>'',
                     'playlist_weights'=>'',
                     'fallback_playlists'=>'',
+                    'fallback_weights'=>'',
                     'chart_date'=>'',
                     'chart_limit'=>100,
                     'auto_make_post'=>$opts['auto_make_post'] ?: '1',
@@ -2012,7 +1988,6 @@ endif; ?>
         $now    = time();
         $capacity = 10; // max tokens
         $rate     = 10; // refill rate per second
-
         if(!is_array($bucket)){
             $bucket = ['tokens' => $capacity, 'ts' => $now];
         }else{
@@ -2022,20 +1997,17 @@ endif; ?>
                 $bucket['ts']     = $now;
             }
         }
-
         if($retry_after > 0){
             $bucket['tokens'] = 0;
             set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
             wp_schedule_single_event(time() + max(1, intval($retry_after)), self::CRON_HOOK);
             return false;
         }
-
         if($bucket['tokens'] < 1){
             set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
             wp_schedule_single_event(time() + 1, self::CRON_HOOK);
             return false;
         }
-
         $bucket['tokens'] -= 1;
         set_transient('waki_chart_tokens', $bucket, MINUTE_IN_SECONDS);
         return true;
@@ -2173,23 +2145,8 @@ endif; ?>
     private function fetch_artists_meta($artist_ids){
         $ids = array_values(array_unique(array_filter((array)$artist_ids)));
         if(!$ids) return [];
-
-        static $cache = [];
         $out = [];
-        $fetch = [];
-        foreach($ids as $id){
-            if(isset($cache[$id])){ $out[$id] = $cache[$id]; continue; }
-            $ckey = 'waki_meta_'.$id;
-            $cached = get_transient($ckey);
-            if($cached !== false){
-                $cache[$id] = $cached;
-                $out[$id] = $cached;
-            } else {
-                $fetch[] = $id;
-            }
-        }
-
-        foreach(array_chunk($fetch, 50) as $chunk){
+        foreach(array_chunk($ids, 50) as $chunk){
             $data = $this->api_request('GET', $this->api_base().'/v1/artists', ['ids'=>implode(',',$chunk)]);
             if(is_wp_error($data)) return $data;
             foreach(($data['artists'] ?? []) as $a){
@@ -2203,7 +2160,7 @@ endif; ?>
                     $img = $a['images'][0]['url'] ?? '';
                 }
                 $bio = $a['bio'] ?? $a['biography'] ?? ($a['profile']['biography']['text'] ?? '');
-                $meta = [
+                $out[$id] = [
                     'artist_id'   => $id,
                     'artist_name' => $name,
                     'genres'      => $genres,
@@ -2213,9 +2170,6 @@ endif; ?>
                     'profile_url' => $a['external_urls']['spotify'] ?? '',
                     'biography'   => is_string($bio) ? $bio : '',
                 ];
-                $out[$id] = $meta;
-                $cache[$id] = $meta;
-                set_transient('waki_meta_'.$id, $meta, DAY_IN_SECONDS);
             }
         }
         return $out;
@@ -2522,6 +2476,7 @@ endif; ?>
 
         $all_by_tid=[];
         $weights = $this->parse_weights_map($chart_conf['playlist_weights'] ?? '');
+        $weights = array_replace($weights, $this->parse_weights_map($chart_conf['fallback_weights'] ?? ''));
         $origin_filter = $this->valid_iso($chart_conf['origin_filter'] ?? '');
         $fallback_ids = ($source_type === 'playlists') ? $this->normalize_many($chart_conf['fallback_playlists'] ?? '') : [];
         $used_fallback = false;
@@ -3278,7 +3233,9 @@ endif; ?>
         $state_log[] = 'Inspecting sources';
         $market = strtoupper($chart_conf['market']);
         $weights = $this->parse_weights_map($chart_conf['playlist_weights'] ?? '');
+        $weights = array_replace($weights, $this->parse_weights_map($chart_conf['fallback_weights'] ?? ''));
         $weights_err = $this->validate_weights_syntax($chart_conf['playlist_weights'] ?? '', $this->normalize_many($chart_conf['playlist_multi'] ?? ''));
+        $fb_weights_err = $this->validate_weights_syntax($chart_conf['fallback_weights'] ?? '', $this->normalize_many($chart_conf['fallback_playlists'] ?? ''));
 
         $playlist_checks = [];
         $all_items = [];
@@ -3384,6 +3341,7 @@ endif; ?>
             'limit'   => $limitWanted,
         ];
         if($weights_err){ $rules['weights_error'] = $weights_err; }
+        if($fb_weights_err){ $rules['fallback_weights_error'] = $fb_weights_err; }
 
         $counts = [
             'Total items gathered' => $total_gathered,
@@ -3406,5 +3364,42 @@ endif; ?>
         ];
     }
 
-}
+    private function default_archive_intro(){
+        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by region and genre, and more.', 'wakilisha-charts');
+    }
 
+    public function register_rest_routes(){
+        register_rest_route('wakicharts/v1', '/archive-intro', [
+            [
+                'methods'  => WP_REST_Server::READABLE,
+                'callback' => [$this, 'rest_get_archive_intro'],
+                'permission_callback' => '__return_true',
+            ],
+            [
+                'methods'  => WP_REST_Server::EDITABLE,
+                'callback' => [$this, 'rest_update_archive_intro'],
+                'permission_callback' => function(){ return current_user_can('manage_options'); },
+                'args'     => [
+                    'intro' => [
+                        'type' => 'string',
+                        'required' => true,
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                ],
+            ],
+        ]);
+    }
+
+    public function rest_get_archive_intro($request){
+        return rest_ensure_response([
+            'intro' => get_option(self::ARCHIVE_INTRO, $this->default_archive_intro())
+        ]);
+    }
+
+    public function rest_update_archive_intro($request){
+        $intro = $request->get_param('intro');
+        update_option(self::ARCHIVE_INTRO, $intro);
+        return rest_ensure_response(['intro' => $intro]);
+    }
+
+}

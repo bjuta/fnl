@@ -2,7 +2,8 @@
           <div class="waki-archive-hero"<?php if($hero_img) echo ' style="--hero:url(\''.$hero_img.'\')"'; ?>>
             <div class="waki-hero-inner">
               <h1 class="waki-hero-title"><?php esc_html_e('WAKILISHA Charts', 'wakilisha-charts'); ?></h1>
-              <p class="waki-hero-sub"><?php esc_html_e('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by region and genre, and more.', 'wakilisha-charts'); ?></p>
+              <?php $intro = get_option(Waki_Charts::ARCHIVE_INTRO, $this->default_archive_intro()); ?>
+              <p class="waki-hero-sub"><?php echo esc_html($intro); ?></p>
             </div>
           </div>
         </template>
@@ -18,10 +19,17 @@
                 <?php
                   $cid   = get_the_ID();
                   $key   = get_post_meta($cid,'_waki_chart_key',true);
-                  $cover = get_post_meta($cid,'_waki_cover_url',true);
+                  $date  = get_post_meta($cid,'_waki_chart_date',true);
+                  $sid   = get_post_meta($cid,'_waki_snapshot_id',true);
+                  $rows  = $this->get_chart_rows($key,$date,10,$sid);
+                  $imgs  = array_filter(array_column($rows,'album_image_url'));
+                  $cover = $imgs ? $imgs[array_rand($imgs)] : '';
                   if(!$cover){
-                    $thumb = get_the_post_thumbnail_url(null,'large');
-                    if($thumb) $cover = $thumb;
+                    $cover = get_post_meta($cid,'_waki_cover_url',true);
+                    if(!$cover){
+                      $thumb = get_the_post_thumbnail_url(null,'large');
+                      if($thumb) $cover = $thumb;
+                    }
                   }
 
                   $country = '';
