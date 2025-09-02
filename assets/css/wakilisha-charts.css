@@ -1,0 +1,194 @@
+body{margin:0}
+header,.site-header,nav{margin-top:0}
+body.single-chart,
+body.single-chart header,
+body.single-chart .site-header,
+body.single-chart nav{margin-top:0}
+/* Shell */
+.waki-wrap{max-width:1000px;margin:0 auto;padding:16px}
+.waki-wrap.waki-fw{max-width:none}
+.waki-arch-title{margin:0 0 6px}
+
+/* HERO (single chart) */
+.waki-chart-hero{
+  position:relative;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  padding:calc(var(--header-h,0px) + 40px) 20px 60px;
+  margin:0;
+  min-height:60vh;
+  background:#111 no-repeat center/cover;
+  background-image:var(--hero);
+  color:#fff;
+  border-radius:0;
+  overflow:hidden;
+}
+.waki-chart-hero::before{
+  content:"";
+  position:absolute;inset:0;
+  background:linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.45) 40%, rgba(0,0,0,.85));
+}
+.waki-hero-inner{position:relative; z-index:1; padding:24px; color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;}
+.waki-chart-hero .waki-hero-title,
+.waki-chart-hero .waki-hero-sub,
+.waki-chart-hero .waki-hero-meta,
+.waki-chart-hero .waki-hero-meta .waki-chip,
+.waki-archive-hero .waki-hero-title,
+.waki-archive-hero .waki-hero-sub{
+  text-shadow:0 2px 4px rgba(0,0,0,.8);
+}
+.waki-hero-title{margin:0 0 6px; color:#fff;}
+.waki-hero-sub{opacity:.85; margin-bottom:12px;}
+.waki-hero-meta{display:flex; flex-wrap:wrap; justify-content:center; gap:8px;}
+.waki-chart-hero .waki-hero-meta{margin-top:8px}
+
+/* Skeleton */
+.waki-skel{display:none;background:#e5e7eb;border-radius:8px;animation:waki-skel 1.2s infinite ease-in-out}
+@keyframes waki-skel{0%{opacity:1}50%{opacity:.4}100%{opacity:1}}
+[data-loading] .waki-skel{display:block}
+[data-loading] .waki-chart-hero,
+[data-loading] .waki-main,
+[data-loading] .waki-archive-grid{display:none}
+
+/* Entry rows */
+.waki-list{display:block}
+.waki-entry{border-radius:10px;background:#fff;margin:10px 0;overflow:hidden;border:1px solid #e5e7eb}
+.waki-entry-head{display:flex;align-items:center;gap:12px;padding:12px 14px;list-style:none;background:inherit}
+.waki-entry[open] .waki-entry-head{background:inherit}
+.waki-entry-pos{display:flex;flex-direction:column;align-items:center}
+.waki-entry-pos .num{font-size:32px;font-weight:800;line-height:1}
+.waki-entry-pos .move{font-size:11px;opacity:.8;margin-top:2px;color:#6b7280}
+.waki-vbar{width:2px;background:#e5e7eb;align-self:stretch}
+.waki-entry-thumb{width:56px;height:56px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex:0 0 56px}
+.waki-entry-thumb img{width:100%;height:100%;display:block;object-fit:cover}
+.waki-entry-main .ttl{font-size:16px;font-weight:700;line-height:1.25;word-break:break-word;white-space:normal}
+.waki-entry-main .art{font-size:14px;opacity:.9;word-break:break-word;white-space:normal}
+.waki-entry-toggle{margin-left:auto;width:18px;height:18px;position:relative}
+.waki-entry-toggle:after{content:'+';font-weight:800;color:#555;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.waki-entry[open] .waki-entry-toggle:after{content:'–';}
+.waki-entry-body{padding:12px 14px;border-top:1px solid #e5e7eb;background:inherit}
+.waki-metrics-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.waki-metrics-grid .tm{background:inherit;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between}
+.waki-metrics-grid .tm-label{font-size:12px;font-weight:600;text-transform:uppercase;color:#6b7280;line-height:1;word-break:break-word}
+.waki-metrics-grid .tm-val{font-size:12px;font-weight:700;line-height:1.2;word-break:break-word}
+.waki-metrics-grid .tm-val.small{font-size:12px;font-weight:700}
+.waki-metrics-grid .tm-sub{font-size:12px;color:#6b7280;margin-top:2px;min-height:14px;word-break:break-word}
+.mv-up{color:#16a34a;font-weight:600}.mv-down{color:#dc2626;font-weight:600}.mv-new{color:#d97706;font-weight:600}
+.waki-chip{display:inline-block;background:#84c241;color:#fff;border:1px solid #84c241;border-radius:999px;padding:4px 10px;margin:2px 4px 0 0;font-size:13px;text-decoration:none}
+
+/* Recent weeks tabs */
+.waki-history{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:10px 0 14px}
+.waki-history-nav{display:flex;flex-wrap:wrap;gap:8px}
+.waki-hbtn{border:1px solid #ddd;background:#fff;border-radius:999px;padding:6px 10px;font-size:13px;cursor:pointer}
+.waki-hbtn.active{background:#84c241;color:#fff;border-color:#84c241}
+
+/* Mini history */
+.waki-mini-btn{margin-top:10px;border:1px solid #84c241;background:#84c241;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.waki-mini-btn .chev{transition:transform .2s}
+.waki-mini-btn.open .chev{transform:rotate(180deg)}
+.waki-hist-mini{margin-top:10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px}
+.waki-spark-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px dashed #e5e7eb;border-radius:6px;padding:6px}
+.waki-spark{display:block}
+.waki-tooltip{position:relative;margin-top:6px;padding:6px 8px;background:#111;color:#fff;border-radius:6px;display:inline-block;font-size:12px}
+.waki-tooltip[hidden]{display:none}
+.waki-mini-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+.waki-mini-table th,.waki-mini-table td{border-top:1px solid #eee;padding:4px 6px;text-align:left}
+
+/* Archive layout — center column (2/4) */
+.waki-archive-hero{position:relative;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:calc(var(--header-h,0px) + 40px) 20px 60px;margin:0;min-height:60vh;background:#111827 no-repeat center/cover;background-image:var(--hero,none);color:#fff;border-radius:0;overflow:hidden}
+.waki-archive-hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.45) 40%, rgba(0,0,0,.85));}
+#waki-archive .waki-archive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
+.waki-arch-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;color:#111}
+.waki-arch-card .cover{padding-top:56%;background-size:cover;background-position:center}
+.waki-arch-card .inner{padding:16px;display:flex;flex-direction:column;flex:1}
+.waki-arch-card h3{margin:0 0 8px;font-size:20px}
+.waki-arch-card h3 a{text-decoration:none;color:inherit}
+.waki-arch-card .meta{margin:0 0 4px;font-size:14px;color:#6b7280}
+.waki-arch-card .view-link{margin-top:auto;align-self:flex-start;background:#84c241;color:#fff;border-radius:6px;padding:8px 14px;font-size:14px;text-decoration:none}
+.waki-arch-card .view-link:hover{background:#6ca32f}
+.waki-pager{margin:20px 0;display:flex;justify-content:center}
+
+@media(max-width:600px){
+  section#waki-archive.waki-wrap{
+    padding-left:0;
+    padding-right:0;
+  }
+  .waki-archive-hero{padding:calc(var(--header-h,0px) + 30px) 16px 40px;min-height:70vh}
+  #waki-archive .waki-archive-grid{
+      display:flex;
+      overflow-x:auto;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      gap:16px;
+      padding-left:0;
+      padding-right:0;
+      scroll-padding-left:0;
+      scroll-padding-right:0;
+  }
+  #waki-archive .waki-arch-card{
+      flex:0 0 85%;
+      scroll-snap-align:start;
+  }
+}
+
+/* Admin UI helpers (charts page) */
+.waki-section{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:12px 0;padding:16px}
+.waki-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.waki-help{font-size:12px;opacity:.8;margin-top:4px}
+.waki-badge{border-radius:999px;padding:4px 8px;font-size:12px;font-weight:700}
+.waki-badge.ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.waki-badge.bad{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.waki-inline-err{color:#b91c1c;font-weight:700}
+.waki-pills{display:flex;flex-wrap:wrap;gap:6px}
+.waki-pill{border:1px solid #e5e7eb;background:#f8fafc;border-radius:999px;padding:2px 8px;font-size:12px}
+.waki-st{display:flex;align-items:center;gap:8px;margin:6px 0}
+.waki-st .dot{width:8px;height:8px;border-radius:999px;background:#d1d5db}
+.waki-st.ok .dot{background:#10b981}
+.waki-st.bad .dot{background:#ef4444}
+.waki-box{background:#f9fafb;border:1px dashed #e5e7eb;padding:10px;border-radius:8px}
+
+/* Artist profile page */
+.waki-artist-hero{display:flex;align-items:center;gap:24px;margin:24px 0}
+.waki-artist-hero .artist-image{width:180px;height:180px;flex:0 0 180px;border-radius:12px;overflow:hidden;background:#f0f0f0;border:1px solid #e5e7eb}
+.waki-artist-hero .artist-image img{width:100%;height:100%;object-fit:cover;display:block}
+.waki-artist-hero .artist-info{flex:1}
+.waki-artist-hero .artist-meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;font-size:14px;opacity:.9}
+.waki-artist-tabs{display:flex;gap:16px;border-bottom:1px solid #e5e7eb;margin-top:24px}
+.waki-artist-tabs .waki-tab-btn{background:none;border:none;padding:8px 0;cursor:pointer;font-size:16px;position:relative}
+.waki-artist-tabs .waki-tab-btn.active{color:#84c241}
+.waki-artist-tabs .waki-tab-btn.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#84c241}
+.waki-artist-tab-content{display:none;padding:20px 0}
+.waki-artist-tab-content.active{display:block}
+
+/* Artist lists */
+.artist-tracks,
+.artist-discography,
+.artist-chart-history,
+.artist-videos,
+.artist-related{list-style:none;margin:20px 0;padding:0;font-size:16px;line-height:1.5}
+.artist-tracks .track,
+.artist-discography .release,
+.artist-chart-history .entry{margin-bottom:8px}
+.artist-videos,
+.artist-related{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.artist-videos .video-item,
+.artist-related .related-artist{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px}
+.artist-videos .video-item a{display:block;color:inherit;text-decoration:none}
+
+@media (max-width:720px){
+  .waki-wrap{padding:12px}
+  .waki-chart-hero{padding:calc(var(--header-h,0px) + 30px) 16px 40px;min-height:70vh;margin:0}
+  .waki-entry-thumb{width:48px;height:48px;flex:0 0 48px}
+  .waki-entry-main .ttl{font-size:15px}
+  .waki-entry-main .art{font-size:13px}
+  .waki-metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .waki-artist-hero{flex-direction:column;text-align:center}
+  .waki-artist-hero .artist-image{width:120px;height:120px;flex:0 0 120px}
+  .waki-artist-hero .artist-meta{justify-content:center}
+  .waki-artist-tabs{overflow-x:auto}
+  .artist-videos,
+  .artist-related{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}

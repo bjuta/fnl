@@ -1,0 +1,329 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-08-31 23:27+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: includes/class-waki-charts.php:361 includes/class-waki-charts.php:494
+msgid "Charts"
+msgstr ""
+
+#: includes/class-waki-charts.php:362
+msgid "Chart"
+msgstr ""
+
+#: includes/class-waki-charts.php:363
+msgid "Add Chart Issue"
+msgstr ""
+
+#: includes/class-waki-charts.php:364
+msgid "Edit Chart Issue"
+msgstr ""
+
+#: includes/class-waki-charts.php:365
+msgid "New Chart Issue"
+msgstr ""
+
+#: includes/class-waki-charts.php:366 templates/charts-archive.php:47
+msgid "View Chart"
+msgstr ""
+
+#: includes/class-waki-charts.php:367
+msgid "Search Charts"
+msgstr ""
+
+#: includes/class-waki-charts.php:368
+msgid "No charts found"
+msgstr ""
+
+#: includes/class-waki-charts.php:492 templates/charts-archive.php:4
+msgid "WAKILISHA Charts"
+msgstr ""
+
+#: includes/class-waki-charts.php:492
+msgid "WAKI Charts"
+msgstr ""
+
+#: includes/class-waki-charts.php:493
+msgid "WAKI Artists"
+msgstr ""
+
+#: includes/class-waki-charts.php:495
+msgid "Settings (API & Global)"
+msgstr ""
+
+#: includes/class-waki-charts.php:527
+msgid "All chart data flushed."
+msgstr ""
+
+#: includes/class-waki-charts.php:535
+#, php-format
+msgid "Chart rows for %1$s (%2$s) flushed."
+msgstr ""
+
+#: includes/class-waki-charts.php:543
+msgid "WAKILISHA — Settings (API & Global)"
+msgstr ""
+
+#: includes/class-waki-charts.php:544
+msgid "Settings saved."
+msgstr ""
+
+#: includes/class-waki-charts.php:548
+msgid "Last error:"
+msgstr ""
+
+#: includes/class-waki-charts.php:552
+msgid "Clear"
+msgstr ""
+
+#: includes/class-waki-charts.php:558
+msgid "API"
+msgstr ""
+
+#: includes/class-waki-charts.php:560
+msgid "Client ID"
+msgstr ""
+
+#: includes/class-waki-charts.php:561
+msgid "Client Secret"
+msgstr ""
+
+#: includes/class-waki-charts.php:562
+msgid "Default Market"
+msgstr ""
+
+#: includes/class-waki-charts.php:562
+msgid "ISO 3166-1 alpha-2 (availability only)"
+msgstr ""
+
+#: includes/class-waki-charts.php:565
+msgid "Scoring (Popularity-centric)"
+msgstr ""
+
+#: includes/class-waki-charts.php:567
+msgid "α (popularity weight)"
+msgstr ""
+
+#: includes/class-waki-charts.php:568
+msgid "β (playlist rank weight)"
+msgstr ""
+
+#: includes/class-waki-charts.php:569
+msgid "γ (recency weight)"
+msgstr ""
+
+#: includes/class-waki-charts.php:570
+msgid "Presence bonus"
+msgstr ""
+
+#: includes/class-waki-charts.php:573
+msgid "Posts (cron default)"
+msgstr ""
+
+#: includes/class-waki-charts.php:575
+msgid "Auto publish"
+msgstr ""
+
+#: includes/class-waki-charts.php:575
+msgid "Yes"
+msgstr ""
+
+#: includes/class-waki-charts.php:576
+msgid "Category"
+msgstr ""
+
+#: includes/class-waki-charts.php:579
+msgid "Archive"
+msgstr ""
+
+#: includes/class-waki-charts.php:582
+msgid "Archive Hero Image"
+msgstr ""
+
+#: includes/class-waki-charts.php:585 includes/class-waki-charts.php:638
+msgid "Select Image"
+msgstr ""
+
+#: includes/class-waki-charts.php:589
+msgid "Hero Image Size"
+msgstr ""
+
+#: includes/class-waki-charts.php:597
+msgid "Applied to archive and single chart heroes."
+msgstr ""
+
+#: includes/class-waki-charts.php:603
+msgid "Save Settings"
+msgstr ""
+
+#: includes/class-waki-charts.php:604
+msgid "Go to Charts"
+msgstr ""
+
+#: includes/class-waki-charts.php:609
+msgid "Danger Zone"
+msgstr ""
+
+#: includes/class-waki-charts.php:614
+msgid "Select chart edition…"
+msgstr ""
+
+#: includes/class-waki-charts.php:624
+msgid "Flush Selected Chart Data"
+msgstr ""
+
+#: includes/class-waki-charts.php:629
+msgid "Flush All Chart Data"
+msgstr ""
+
+#: includes/class-waki-charts.php:646
+msgid ""
+"This will permanently delete all chart data. This action cannot be undone. "
+"Continue?"
+msgstr ""
+
+#: includes/class-waki-charts.php:650
+msgid "Please select a chart edition to flush."
+msgstr ""
+
+#: includes/class-waki-charts.php:651
+msgid "This will permanently delete the selected chart data. Continue?"
+msgstr ""
+
+#: includes/class-waki-charts.php:1823 includes/class-waki-charts.php:1825
+msgid "Client ID/secret not configured."
+msgstr ""
+
+#: includes/class-waki-charts.php:1837
+#, php-format
+msgid "Authentication request failed: %s"
+msgstr ""
+
+#: includes/class-waki-charts.php:1845
+msgid "Authentication with Spotify failed."
+msgstr ""
+
+#: includes/class-waki-charts.php:1864
+#, php-format
+msgid "Spotify API request failed: %s"
+msgstr ""
+
+#: includes/class-waki-charts.php:1877
+#, php-format
+msgid "Spotify API returned an error (HTTP %d)."
+msgstr ""
+
+#: includes/class-waki-charts.php:1881
+msgid "Spotify API request failed after multiple attempts."
+msgstr ""
+
+#: includes/class-waki-charts.php:2288
+msgid "Configure Client ID/Secret first in Settings."
+msgstr ""
+
+#: templates/artist-profile.php:5
+msgid "Artist not found."
+msgstr ""
+
+#: templates/artist-profile.php:26
+#, php-format
+msgid "%s followers"
+msgstr ""
+
+#: templates/artist-profile.php:33
+msgid "Overview"
+msgstr ""
+
+#: templates/artist-profile.php:34
+msgid "Discography"
+msgstr ""
+
+#: templates/artist-profile.php:35
+msgid "Chart History"
+msgstr ""
+
+#: templates/artist-profile.php:36
+msgid "Videos"
+msgstr ""
+
+#: templates/artist-profile.php:37
+msgid "Related Artists"
+msgstr ""
+
+#: templates/artist-profile.php:56
+msgid "No overview available."
+msgstr ""
+
+#: templates/artist-profile.php:69
+msgid "No discography available."
+msgstr ""
+
+#: templates/artist-profile.php:81
+msgid "No chart history available."
+msgstr ""
+
+#: templates/artist-profile.php:93
+msgid "No videos available."
+msgstr ""
+
+#: templates/artist-profile.php:105
+msgid "No related artists available."
+msgstr ""
+
+#: templates/history-mini.php:24
+msgid "Date"
+msgstr ""
+
+#: templates/history-mini.php:24
+msgid "Position"
+msgstr ""
+
+#: templates/history-mini.php:31
+msgid ""
+"Tip: scroll the graph horizontally to see older weeks. Hover or tap points "
+"for exact position and date."
+msgstr ""
+
+#: templates/charts-archive.php:5
+msgid ""
+"From club heaters to quiet stunners, this is a living record of Kenyan "
+"music, tracked weekly, filtered by region and genre, and more."
+msgstr ""
+
+#: templates/charts-archive.php:13
+msgid "No charts yet."
+msgstr ""
+
+#: templates/charts-archive.php:44 templates/latest-chart.php:11
+#, php-format
+msgid "Updated %s"
+msgstr ""
+
+#: templates/charts-archive.php:45
+#, php-format
+msgid "Region: %s"
+msgstr ""
+
+#: templates/charts-archive.php:46
+#, php-format
+msgid "Genres: %s"
+msgstr ""
+
+#: templates/latest-chart.php:8
+#, php-format
+msgid "Featuring %s and more"
+msgstr ""
