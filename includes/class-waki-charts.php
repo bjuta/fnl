@@ -2043,7 +2043,7 @@ endif; ?>
         ];
     }
 
-    /* ===== NEW: fetch artists meta (followers, popularity, genres, image, url) ===== */
+    /* ===== NEW: fetch artists meta (followers, popularity, genres, image, url, biography) ===== */
     private function fetch_artists_meta($artist_ids){
         $ids = array_values(array_unique(array_filter((array)$artist_ids)));
         if(!$ids) return [];
@@ -2061,6 +2061,7 @@ endif; ?>
                     usort($a['images'], fn($x,$y)=>intval($y['width']??0)<=>intval($x['width']??0));
                     $img = $a['images'][0]['url'] ?? '';
                 }
+                $bio = $a['bio'] ?? $a['biography'] ?? ($a['profile']['biography']['text'] ?? '');
                 $out[$id] = [
                     'artist_id'   => $id,
                     'artist_name' => $name,
@@ -2069,20 +2070,10 @@ endif; ?>
                     'popularity'  => intval($a['popularity'] ?? 0),
                     'image_url'   => $img,
                     'profile_url' => $a['external_urls']['spotify'] ?? '',
+                    'biography'   => is_string($bio) ? $bio : '',
                 ];
             }
         }
-
-        // Fetch biography separately (no bulk endpoint)
-        foreach(array_keys($out) as $aid){
-            $bio = '';
-            $about = $this->api_request('GET', $this->api_base().'/v1/artists/'.rawurlencode($aid));
-            if(!is_wp_error($about)){
-                $bio = $about['bio'] ?? $about['biography'] ?? ($about['profile']['biography']['text'] ?? '');
-            }
-            $out[$aid]['biography'] = is_string($bio) ? $bio : '';
-        }
-
         return $out;
     }
 
