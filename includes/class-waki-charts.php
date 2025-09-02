@@ -5,6 +5,7 @@ final class Waki_Charts {
     const OPTS       = 'waki_chart_options';
     const CHARTS     = 'waki_charts';
     const CRON_HOOK  = 'waki_chart_ingest_daily';
+    const RETRY_HOOK = 'waki_chart_api_retry';
     const TZ         = 'Africa/Nairobi';
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
@@ -41,6 +42,7 @@ final class Waki_Charts {
         add_action('admin_init',             [$this,'handle_dry_run_action']);
 
         add_action(self::CRON_HOOK,          [$this,'cron_run_all_charts']);
+        add_action(self::RETRY_HOOK,         [$this,'resume_api_request']);
 
         // Auto enqueue on CPT single/archive or shortcodes
         add_action('wp',                     [$this,'maybe_enqueue_assets']);
@@ -1956,8 +1958,18 @@ endif; ?>
             $body_raw = wp_remote_retrieve_body($res);
             $body = json_decode($body_raw,true);
 
-            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); $this->maybe_throttle(max(1,$ra)); return new WP_Error('throttle','Rate limited'); }
-            if ($code==401 && $attempts<$retry){ delete_transient('waki_chart_access_token'); $token=$this->get_access_token(); if(is_wp_error($token)) return $token; $args['headers']['Authorization']='Bearer '.$token; continue; }
+            if ($code==429){
+                $ra = wp_remote_retrieve_header($res,'retry-after');
+                $delay = is_numeric($ra) ? (int)$ra : max(1, strtotime($ra) - time());
+                $delay = max(1,$delay);
+                $this->maybe_throttle($delay);
+                $key = 'waki_chart_api_retry_'.md5($method.$url.serialize($query).microtime(true));
+                set_transient($key, ['method'=>$method,'url'=>$url,'query'=>$query,'retry'=>$retry], $delay + MINUTE_IN_SECONDS);
+                wp_schedule_single_event(time()+$delay, self::RETRY_HOOK, [$key]);
+                error_log('[WAKI Charts] Deferred API request due to 429: '.$url.'; retry in '.$delay.'s (key: '.$key.')');
+                return new WP_Error('throttle','Rate limited');
+            }
+            if ($code==401 && $attempts<$retry){ delete_transient('waki_chart_access_token'); $token=$this->get_access_token();if(is_wp_error($token)) return $token; $args['headers']['Authorization']='Bearer '.$token; continue; }
             if ($code>=200 && $code<300) return is_array($body) ? $body : [];
             error_log('[WAKI Charts] API error: '.$url.' — '.$code.' — '.substr((string)$body_raw,0,300));
             add_action('admin_notices',function() use ($code){ echo '<div class="error"><p>'.sprintf(esc_html__('Spotify API returned an error (HTTP %d).', 'wakilisha-charts'), intval($code)).'</p></div>'; });
@@ -1968,6 +1980,16 @@ endif; ?>
         return new WP_Error('api_error','API request failed after retries.');
     }
 
+    public function resume_api_request($key){
+        $payload = get_transient($key);
+        if(!$payload){
+            error_log('[WAKI Charts] No deferred payload for key '.$key);
+            return;
+        }
+        delete_transient($key);
+        error_log('[WAKI Charts] Resuming deferred API request: '.$payload['url']);
+        $this->api_request($payload['method'], $payload['url'], $payload['query'], $payload['retry']);
+    }
     private function fetch_playlist_tracks($playlist_id,$market){
         $pid = $this->normalize_playlist_id($playlist_id);
         if(!$pid) return new WP_Error('bad_playlist','Invalid playlist id');
