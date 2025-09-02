@@ -1895,6 +1895,14 @@ endif; ?>
         set_transient('waki_chart_access_token',$token,$ttl);
         return $token;
     }
+    private function compat_sleep($seconds){
+        if(function_exists('wp_sleep')) wp_sleep($seconds);
+        else{
+            $seconds = (float) $seconds;
+            if($seconds > floor($seconds)) usleep((int) round($seconds * 1e6));
+            else sleep((int) $seconds);
+        }
+    }
     private function api_request($method,$url,$query=[],$retry=3){
         $token = $this->get_access_token(); if(is_wp_error($token)) return $token;
         if(!empty($query)){ $qs = http_build_query($query); $url .= (strpos($url,'?')===false?'?':'&').$qs; }
@@ -1909,13 +1917,13 @@ endif; ?>
                     add_action('admin_notices',function() use ($res){ echo '<div class="error"><p>'.sprintf(esc_html__('Spotify API request failed: %s', 'wakilisha-charts'), esc_html($res->get_error_message())).'</p></div>'; });
                     return $res;
                 }
-                wp_sleep(1); continue;
+                $this->compat_sleep(1); continue;
             }
             $code = wp_remote_retrieve_response_code($res);
             $body_raw = wp_remote_retrieve_body($res);
             $body = json_decode($body_raw,true);
 
-            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); wp_sleep(max(1,$ra)); continue; }
+            if ($code==429){ $ra=intval(wp_remote_retrieve_header($res,'retry-after')); $this->compat_sleep(max(1,$ra)); continue; }
             if ($code==401 && $attempts<$retry){ delete_transient('waki_chart_access_token'); $token=$this->get_access_token(); if(is_wp_error($token)) return $token; $args['headers']['Authorization']='Bearer '.$token; continue; }
             if ($code>=200 && $code<300) return is_array($body) ? $body : [];
             error_log('[WAKI Charts] API error: '.$url.' — '.$code.' — '.substr((string)$body_raw,0,300));
