@@ -41,6 +41,7 @@ final class Waki_Charts {
         add_action('admin_init',             [$this,'handle_charts_actions']);
         add_action('admin_init',             [$this,'handle_artist_actions']);
         add_action('admin_init',             [$this,'handle_dry_run_action']);
+        add_action('admin_init',             [$this,'handle_archive_reset_action']);
 
         add_action(self::CRON_HOOK,          [$this,'cron_run_all_charts']);
         add_action(self::RETRY_HOOK,         [$this,'resume_api_request']);
@@ -64,19 +65,22 @@ final class Waki_Charts {
         // Artist profile routing
         add_filter('query_vars',            [$this,'add_query_vars']);
         add_filter('template_include',      [$this,'load_artist_template']);
+
+        if (defined('WP_CLI') && WP_CLI) {
+            \WP_CLI::add_command('waki-charts reset-archive', [$this, 'cli_reset_archive']);
+        }
     }
 
     /* ===== Lifecycle ===== */
     public function activate(){
         $this->create_tables();
         $this->schedule_daily_cron();
-        $this->reset_archive_page();
+        $this->ensure_archive_page();
         $this->register_cpt();
         flush_rewrite_rules();
         update_option(self::SLUG . '_ver', self::VER);
     }
     public function deactivate(){
-        $this->reset_archive_page();
         wp_clear_scheduled_hook(self::CRON_HOOK);
         flush_rewrite_rules();
     }
@@ -296,9 +300,7 @@ final class Waki_Charts {
         // cleanup: rule — remove unnamed artists
         $wpdb->query("DELETE FROM {$this->artist_table} WHERE artist_name IS NULL OR artist_name=''");
 
-        $opts = $this->get_options();
-        $page_id = intval($opts['charts_archive_page_id'] ?? 0);
-        if (!$page_id || !get_post($page_id)) $this->reset_archive_page();
+        $this->ensure_archive_page();
 
         // refresh rewrite rules when the plugin version changes to avoid 404s
         $stored_ver = get_option(self::SLUG . '_ver');
@@ -319,23 +321,26 @@ final class Waki_Charts {
         }
     }
 
-    private function reset_archive_page(){
+    private function ensure_archive_page(){
         global $wp_rewrite;
         if (!($wp_rewrite instanceof WP_Rewrite)) {
-            error_log('Waki_Charts: WP_Rewrite not initialized; aborting archive page reset.');
+            error_log('Waki_Charts: WP_Rewrite not initialized; aborting archive page setup.');
             return;
         }
         $wp_rewrite->init();
 
         $opts = $this->get_options();
         $page_id = intval($opts['charts_archive_page_id'] ?? 0);
-        if ($page_id) {
-            wp_delete_post($page_id, true);
-        }
+        if ($page_id && get_post($page_id)) return;
+
         $existing = get_page_by_path(self::CPT_SLUG);
-        if ($existing && ($existing->ID !== $page_id)) {
-            wp_delete_post($existing->ID, true);
+        if ($existing) {
+            $opts['charts_archive_page_id'] = $existing->ID;
+            update_option(self::OPTS, $opts);
+            $wp_rewrite->flush_rules(false);
+            return;
         }
+
         $page_id = wp_insert_post([
             'post_title'   => 'Charts',
             'post_name'    => self::CPT_SLUG,
@@ -348,6 +353,29 @@ final class Waki_Charts {
             update_option(self::OPTS, $opts);
             $wp_rewrite->flush_rules(false);
         }
+    }
+
+    private function reset_archive_page(){
+        global $wp_rewrite;
+        if (!($wp_rewrite instanceof WP_Rewrite)) {
+            error_log('Waki_Charts: WP_Rewrite not initialized; aborting archive page reset.');
+            return;
+        }
+        $wp_rewrite->init();
+
+        $opts = $this->get_options();
+        $page_id = intval($opts['charts_archive_page_id'] ?? 0);
+        if ($page_id) {
+            wp_delete_post($page_id, true);
+            $opts['charts_archive_page_id'] = 0;
+            update_option(self::OPTS, $opts);
+        }
+        $existing = get_page_by_path(self::CPT_SLUG);
+        if ($existing && ($existing->ID !== $page_id)) {
+            wp_delete_post($existing->ID, true);
+        }
+
+        $this->ensure_archive_page();
     }
 
     /* ===== Options ===== */
@@ -589,11 +617,13 @@ final class Waki_Charts {
 
         $opts = $this->get_options();
         $last_error = get_option(self::SLUG.'_last_error','');
+        $reset_done = !empty($_GET[self::SLUG.'_reset_done']);
         ?>
         <div class="wrap">
           <h1><?php esc_html_e('WAKILISHA — Settings (API & Global)', 'wakilisha-charts'); ?></h1>
           <?php if($saved): ?><div class="updated"><p><?php esc_html_e('Settings saved.', 'wakilisha-charts'); ?></p></div><?php endif; ?>
           <?php if($purged): ?><div class="updated"><p><?php echo esc_html($purge_msg); ?></p></div><?php endif; ?>
+          <?php if($reset_done): ?><div class="updated"><p><?php esc_html_e('Archive page reset.', 'wakilisha-charts'); ?></p></div><?php endif; ?>
           <?php if($last_error): ?>
           <div class="notice notice-error is-dismissible">
             <p><strong><?php esc_html_e('Last error:', 'wakilisha-charts'); ?></strong> <?php echo esc_html($last_error);?></p>
@@ -658,6 +688,8 @@ final class Waki_Charts {
 
           <hr>
           <h2><?php esc_html_e('Danger Zone', 'wakilisha-charts'); ?></h2>
+          <?php $reset_url = wp_nonce_url(add_query_arg(self::SLUG.'_reset_archive','1'), self::SLUG.'_reset_archive'); ?>
+          <p><a class="button waki-reset-archive" href="<?php echo esc_url($reset_url); ?>"><?php esc_html_e('Reset Archive Page', 'wakilisha-charts'); ?></a></p>
           <form method="post" class="waki-purge-form">
             <?php wp_nonce_field(self::SLUG.'_purge_one'); ?>
             <p>
@@ -700,6 +732,9 @@ final class Waki_Charts {
             var sel = $(this).closest('form').find('select[name=purge_combo]');
             if(!sel.val()){ e.preventDefault(); alert('<?php echo esc_js(__('Please select a chart edition to flush.', 'wakilisha-charts')); ?>'); return; }
             if(!confirm('<?php echo esc_js(__('This will permanently delete the selected chart data. Continue?', 'wakilisha-charts')); ?>')) e.preventDefault();
+          });
+          $('.waki-reset-archive').on('click',function(e){
+            if(!confirm('<?php echo esc_js(__('This will recreate the archive page. Continue?', 'wakilisha-charts')); ?>')) e.preventDefault();
           });
         });
         </script>
@@ -1816,6 +1851,22 @@ endif; ?>
             $this->ingest_and_compute_chart('default',$charts['default'], true, true);
             wp_safe_redirect(remove_query_arg([self::SLUG.'_run','_wpnonce'])); exit;
         }
+    }
+
+    public function handle_archive_reset_action(){
+        if (!current_user_can('manage_options')) return;
+        if (isset($_GET[self::SLUG.'_reset_archive'])) {
+            check_admin_referer(self::SLUG.'_reset_archive');
+            $this->reset_archive_page();
+            $redirect = remove_query_arg([self::SLUG.'_reset_archive','_wpnonce']);
+            $redirect = add_query_arg(self::SLUG.'_reset_done', '1', $redirect);
+            wp_safe_redirect($redirect); exit;
+        }
+    }
+
+    public function cli_reset_archive($args, $assoc_args){
+        $this->reset_archive_page();
+        \WP_CLI::success('Archive page reset.');
     }
     public function handle_charts_actions(){
         if (!current_user_can('manage_options')) return;
