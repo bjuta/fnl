@@ -28,7 +28,8 @@ final class Waki_Charts {
 
         register_activation_hook(WAKI_CHARTS_PLUGIN_FILE,  [$this,'activate']);
         register_deactivation_hook(WAKI_CHARTS_PLUGIN_FILE,[$this,'deactivate']);
-        add_action('plugins_loaded',         [$this,'maybe_upgrade']);
+        // Run upgrade routines after WordPress is fully initialized to avoid early-load issues.
+        add_action('init',                   [$this,'maybe_upgrade'], 11);
 
         // CPT + templates
         add_action('init',                   [$this,'register_cpt']);
@@ -319,6 +320,13 @@ final class Waki_Charts {
     }
 
     private function reset_archive_page(){
+        global $wp_rewrite;
+        if (!($wp_rewrite instanceof WP_Rewrite)) {
+            error_log('Waki_Charts: WP_Rewrite not initialized; aborting archive page reset.');
+            return;
+        }
+        $wp_rewrite->init();
+
         $opts = $this->get_options();
         $page_id = intval($opts['charts_archive_page_id'] ?? 0);
         if ($page_id) {
@@ -338,6 +346,7 @@ final class Waki_Charts {
         if (!is_wp_error($page_id)) {
             $opts['charts_archive_page_id'] = $page_id;
             update_option(self::OPTS, $opts);
+            $wp_rewrite->flush_rules(false);
         }
     }
 
