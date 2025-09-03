@@ -2056,6 +2056,21 @@ endif; ?>
               <?php endforeach; ?>
             </tbody>
           </table>
+          <?php if(!empty($report['parsed_meta'])): ?>
+            <h4>Parsed Metadata</h4>
+            <table class="widefat striped">
+              <tbody>
+                <tr><th>Countries</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['countries'] ?? [])); ?></td></tr>
+                <tr><th>Region</th><td><?php echo esc_html($report['parsed_meta']['region'] ?: '—'); ?></td></tr>
+                <tr><th>Genres</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['genres'] ?? [])); ?></td></tr>
+                <tr><th>Languages</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['languages'] ?? [])); ?></td></tr>
+                <tr><th>Format</th><td><?php echo esc_html($report['parsed_meta']['format'] ?: '—'); ?></td></tr>
+                <tr><th>Country key</th><td><?php echo esc_html($report['parsed_meta']['country_key'] ?: '—'); ?></td></tr>
+                <tr><th>Chart key</th><td><?php echo esc_html($report['parsed_meta']['chart_key'] ?: '—'); ?></td></tr>
+                <tr><th>URL</th><td><?php if(!empty($report['parsed_meta']['url'])) echo '<a href="'.esc_url($report['parsed_meta']['url']).'" target="_blank">'.esc_html($report['parsed_meta']['url']).'</a>'; else echo '—'; ?></td></tr>
+              </tbody>
+            </table>
+          <?php endif; ?>
 
           <?php if(!empty($report['dedupe_sample'])): ?>
             <h4>Deduplication Sample</h4>
@@ -2090,6 +2105,66 @@ endif; ?>
         $y = trim($y); if(!$y) return '';
         $dt = DateTime::createFromFormat('!Y-m-d', $y, new DateTimeZone(self::TZ));
         return $dt ? $dt->format('Y-m-d') : '';
+    }
+
+    private function parse_chart_meta($row){
+        $split = function($str){
+            return array_filter(array_map('trim', preg_split('/[\s,|]+/', (string)$str)));
+        };
+
+        $countries = [];
+        foreach($split($row['countries'] ?? '') as $code){
+            $code = strtolower($code);
+            if(preg_match('/^[a-z]{2}$/',$code) && term_exists($code,'waki_country')){
+                $countries[] = $code;
+            }
+        }
+        $countries = array_values(array_unique($countries));
+
+        $region    = sanitize_title($row['region'] ?? '');
+        $genres    = array_values(array_unique(array_map('sanitize_title', $split($row['genres'] ?? ''))));
+        $languages = array_values(array_unique(array_map('sanitize_title', $split($row['languages'] ?? ''))));
+        $format    = sanitize_title($row['format'] ?? '');
+
+        $country_key = '';
+        if($countries){
+            $slugs = $countries; sort($slugs, SORT_STRING);
+            $key=''; $count=0;
+            foreach($slugs as $slug){
+                $candidate = $key===''?$slug:$key.'-'.$slug;
+                if(strlen($candidate)>40 || $count>=10) break;
+                $key = $candidate; $count++;
+            }
+            $country_key = $key;
+        }
+
+        $base = $country_key ?: $region;
+        $first_genre = $genres[0] ?? '';
+        $parts = array_filter([$base, $first_genre, $format]);
+        $chart_key = strtolower(implode('-', $parts));
+
+        $date = $this->safe_date($row['chart_date'] ?? '');
+        if($country_key){
+            $path = implode('/', array_filter([$country_key, $first_genre, $format]));
+            $url = home_url('/'.self::CPT_SLUG.'/country/'.$path.'/'.($date ?: 'latest').'/');
+        }elseif($region){
+            $path = implode('/', array_filter([$region, $first_genre, $format]));
+            $url = home_url('/'.self::CPT_SLUG.'/region/'.$path.'/'.($date ?: 'latest').'/');
+        }else{
+            $url = '';
+        }
+
+        return [
+            'countries'=>$countries,
+            'region'=>$region,
+            'genres'=>$genres,
+            'languages'=>$languages,
+            'format'=>$format,
+            'country_key'=>$country_key,
+            'chart_key'=>$chart_key,
+            'date'=>$date,
+            'url'=>$url,
+        ];
     }
 
     /* ===== Manual run shims ===== */
@@ -3455,6 +3530,7 @@ endif; ?>
         $state_log = [];
         $state_log[] = 'Idle';
         $state_log[] = 'Validating config';
+        $meta = $this->parse_chart_meta($chart_conf);
 
         $pre = $this->validate_chart_config([
             'slug'=>$chart_conf['slug'],'title'=>$chart_conf['title'],'market'=>$chart_conf['market'],
@@ -3474,7 +3550,8 @@ endif; ?>
                 'rules'=>[],
                 'counts'=>['error'=>1],
                 'top_preview'=>[],
-                'dedupe_sample'=>[]
+                'dedupe_sample'=>[],
+                'parsed_meta'=>$meta
             ];
         }
 
@@ -3608,7 +3685,8 @@ endif; ?>
             'rules'=>$rules,
             'counts'=>$counts,
             'top_preview'=>$top_preview,
-            'dedupe_sample'=>$dedupe_sample
+            'dedupe_sample'=>$dedupe_sample,
+            'parsed_meta'=>$meta
         ];
     }
 
