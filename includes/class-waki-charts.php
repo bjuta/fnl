@@ -64,6 +64,7 @@ final class Waki_Charts {
         add_action('wp_trash_post',        [$this,'remove_chart_rows']);
         add_action('before_delete_post',   [$this,'remove_chart_rows']);
 
+        add_action('template_redirect',   [$this,'maybe_redirect_chart']);
         add_action('wp_head',              [$this,'output_social_meta']);
         add_action('wp_head',              [$this,'output_chart_canonical']);
         add_filter('pre_get_shortlink',    [$this,'pretty_shortlink'], 10, 2);
@@ -743,6 +744,36 @@ final class Waki_Charts {
                 }
             }
         }
+    }
+
+    public function maybe_redirect_chart(){
+        if (is_admin() || !is_singular(self::CPT)) return;
+
+        $pid = get_queried_object_id();
+        if (!$pid) return;
+
+        $canonical = sanitize_title(get_post_meta($pid, '_waki_country_key', true));
+        if (empty($canonical)) return;
+
+        $requested_country = sanitize_title(get_query_var('waki_chart_country'));
+        if ($requested_country === $canonical) return;
+
+        $genre_terms  = get_the_terms($pid, 'waki_genre');
+        $format_terms = get_the_terms($pid, 'waki_format');
+        $genre  = ($genre_terms && !is_wp_error($genre_terms)) ? $genre_terms[0]->slug : '';
+        $format = ($format_terms && !is_wp_error($format_terms)) ? $format_terms[0]->slug : '';
+
+        $parts = array_filter([$canonical, $genre, $format]);
+        $chart_key = get_post_meta($pid, '_waki_chart_key', true);
+        $date = get_post_meta($pid, '_waki_chart_date', true);
+        $latest = $date && $date === $this->get_latest_chart_date($chart_key);
+
+        $url = home_url('/' . self::CPT_SLUG . '/country/' . implode('/', $parts) . '/');
+        $url .= $latest ? 'latest' : $date;
+        $url .= '/';
+
+        wp_redirect($url, 301);
+        exit;
     }
 
     public function output_chart_canonical(){
