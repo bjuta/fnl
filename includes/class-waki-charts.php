@@ -448,13 +448,12 @@ final class Waki_Charts {
         }
         $slugs = array_unique(array_map(function($t){ return strtolower(sanitize_title($t->slug)); }, $terms));
         sort($slugs, SORT_STRING);
-        $key = '';
-        $count = 0;
-        foreach($slugs as $slug){
-            $candidate = $key===''?$slug:$key.'-'.$slug;
-            if(strlen($candidate)>40 || $count>=10) break;
-            $key = $candidate;
-            $count++;
+        if (count($slugs) > 10){
+            wp_die(__('At most 10 unique countries allowed.', 'wakilisha-charts'));
+        }
+        $key = implode('-', $slugs);
+        if(strlen($key) > 40){
+            wp_die(__('Country key cannot exceed 40 characters.', 'wakilisha-charts'));
         }
         update_post_meta($post_id,'_waki_country_key',$key);
         return $key;
@@ -479,9 +478,6 @@ final class Waki_Charts {
         if($post->post_type!==self::CPT) return;
         if(wp_is_post_revision($post_id)) return;
 
-        $country_key = $this->compute_country_key($post_id);
-        $this->compute_chart_key($post_id,$country_key);
-
         $errors=[];
         $countries = get_the_terms($post_id,'waki_country');
         $regions   = get_the_terms($post_id,'waki_region');
@@ -495,12 +491,20 @@ final class Waki_Charts {
             }
         }
         foreach(['waki_genre','waki_language'] as $tax){
-            $terms = get_the_terms($post_id,$tax);
-            if($terms && is_wp_error($terms)){
-                $errors[] = sprintf(__('Unknown %s terms assigned.','wakilisha-charts'), $tax);
+            $raw = $_POST['tax_input'][$tax] ?? [];
+            $vals = is_array($raw) ? $raw : preg_split('/[\s,]+/', (string)$raw);
+            foreach($vals as $slug){
+                $slug = sanitize_title($slug);
+                if($slug === '') continue;
+                if(!term_exists($slug,$tax)){
+                    $errors[] = sprintf(__('Unknown %s term: %s','wakilisha-charts'), $tax, $slug);
+                }
             }
         }
         if($errors){ wp_die(implode('<br>', $errors)); }
+
+        $country_key = $this->compute_country_key($post_id);
+        $this->compute_chart_key($post_id,$country_key);
     }
 
     public function add_chart_keys_meta_box(){
@@ -687,12 +691,18 @@ final class Waki_Charts {
                         $query->set('p', intval($pid));
                         $query->is_single = true;
                         $query->is_singular = true;
+                        $reg_terms = get_the_terms($pid,'waki_region');
+                        $reg_slug = '';
+                        if($reg_terms && !is_wp_error($reg_terms)){
+                            $reg_slug = strtolower(sanitize_title($reg_terms[0]->slug));
+                        }
                         $this->resolved_chart = [
                             'key' => $key,
                             'date' => $date,
                             'genre' => $genre,
                             'format' => $format,
                             'region' => $region,
+                            'region_term' => $reg_slug,
                             'latest' => !empty($latest) || empty($query->get('waki_chart_date')),
                             'canonical_country' => get_post_meta($pid, '_waki_country_key', true),
                         ];
@@ -2132,6 +2142,7 @@ endif; ?>
         $split = function($str){
             return array_filter(array_map('trim', preg_split('/[\s,|]+/', (string)$str)));
         };
+        $errors = [];
 
         $countries = [];
         foreach($split($row['countries'] ?? '') as $code){
@@ -2141,23 +2152,35 @@ endif; ?>
             }
         }
         $countries = array_values(array_unique($countries));
+        if(count($countries) > 10){
+            $errors[] = __('At most 10 unique countries allowed.','wakilisha-charts');
+        }
 
         $region    = sanitize_title($row['region'] ?? '');
         $genres    = array_values(array_unique(array_map('sanitize_title', $split($row['genres'] ?? ''))));
+        foreach($genres as $slug){
+            if(!term_exists($slug,'waki_genre')){
+                $errors[] = sprintf(__('Unknown genre “%s”.','wakilisha-charts'), $slug);
+            }
+        }
         $languages = array_values(array_unique(array_map('sanitize_title', $split($row['languages'] ?? ''))));
+        foreach($languages as $slug){
+            if(!term_exists($slug,'waki_language')){
+                $errors[] = sprintf(__('Unknown language “%s”.','wakilisha-charts'), $slug);
+            }
+        }
         $format    = sanitize_title($row['format'] ?? '');
 
         $country_key = '';
         if($countries){
             $slugs = $countries; sort($slugs, SORT_STRING);
-            $key=''; $count=0;
-            foreach($slugs as $slug){
-                $candidate = $key===''?$slug:$key.'-'.$slug;
-                if(strlen($candidate)>40 || $count>=10) break;
-                $key = $candidate; $count++;
+            $country_key = implode('-', $slugs);
+            if(strlen($country_key) > 40){
+                $errors[] = __('Country key cannot exceed 40 characters.','wakilisha-charts');
             }
-            $country_key = $key;
         }
+
+        if($errors){ wp_die(implode('<br>', $errors)); }
 
         $base = $country_key ?: $region;
         $first_genre = $genres[0] ?? '';
