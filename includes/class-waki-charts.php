@@ -673,15 +673,6 @@ final class Waki_Charts {
             'rewrite' => ['slug' => 'country', 'with_front' => false],
             'hierarchical' => false,
         ]));
-
-        register_taxonomy('waki_region', [self::CPT], array_merge($common, [
-            'labels' => [
-                'name' => __('Regions', 'wakilisha-charts'),
-                'singular_name' => __('Region', 'wakilisha-charts'),
-            ],
-            'rewrite' => ['slug' => 'region', 'with_front' => false],
-            'hierarchical' => true,
-        ]));
     }
 
     /* ===== CPT ===== */
@@ -734,7 +725,6 @@ final class Waki_Charts {
     public function register_chart_rewrites(){
         $base = self::CPT_SLUG;
         add_rewrite_tag('%waki_chart_country%', '([^/]+)');
-        add_rewrite_tag('%waki_chart_region%', '([^/]+)');
         add_rewrite_tag('%waki_chart_genre%', '([^/]+)');
         add_rewrite_tag('%waki_chart_format%', '([^/]+)');
         add_rewrite_tag('%waki_chart_date%', '([0-9]{4}-[0-9]{2}-[0-9]{2})');
@@ -742,13 +732,13 @@ final class Waki_Charts {
 
         // /charts/{format}/{YYYY-MM-DD}/ -> specific edition
         add_rewrite_rule(
-            "^{$base}/(?!country|region)([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$",
+            "^{$base}/(?!country)([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$",
             'index.php?waki_chart_format=$matches[1]&waki_chart_date=$matches[2]',
             'top'
         );
         // /charts/{format}/ -> format hub archive
         add_rewrite_rule(
-            "^{$base}/(?!country|region)([^/]+)/?$",
+            "^{$base}/(?!country)([^/]+)/?$",
             'index.php?post_type=' . self::CPT . '&waki_chart_format=$matches[1]',
             'top'
         );
@@ -758,10 +748,6 @@ final class Waki_Charts {
         add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_latest=1', 'top');
         add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_format=$matches[2]&waki_chart_latest=1', 'top');
 
-        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_date=$matches[4]', 'top');
-        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_format=$matches[2]&waki_chart_date=$matches[3]', 'top');
-        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_latest=1', 'top');
-        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_format=$matches[2]&waki_chart_latest=1', 'top');
     }
 
     public function add_query_vars($vars){
@@ -770,7 +756,6 @@ final class Waki_Charts {
         $vars[] = 'preview';
         $vars[] = '_wpnonce';
         $vars[] = 'waki_chart_country';
-        $vars[] = 'waki_chart_region';
         $vars[] = 'waki_chart_genre';
         $vars[] = 'waki_chart_format';
         $vars[] = 'waki_chart_date';
@@ -793,14 +778,12 @@ final class Waki_Charts {
                 }
                 $country = implode('-', $slugs);
             }
-            $region  = sanitize_title($query->get('waki_chart_region'));
             $genre   = sanitize_title($query->get('waki_chart_genre'));
             $format  = sanitize_title($query->get('waki_chart_format'));
             $date    = sanitize_text_field($query->get('waki_chart_date'));
             $latest  = $query->get('waki_chart_latest');
-            if ($country || $region){
-                $base = $country ?: $region;
-                $parts = array_filter([$base, $genre, $format]);
+            if ($country){
+                $parts = array_filter([$country, $genre, $format]);
                 $key   = strtolower(implode('-', $parts));
                 if ($key){
                     $pid = 0;
@@ -834,18 +817,11 @@ final class Waki_Charts {
                         $query->set('p', intval($pid));
                         $query->is_single = true;
                         $query->is_singular = true;
-                        $reg_terms = get_the_terms($pid,'waki_region');
-                        $reg_slug = '';
-                        if($reg_terms && !is_wp_error($reg_terms)){
-                            $reg_slug = strtolower(sanitize_title($reg_terms[0]->slug));
-                        }
                         $this->resolved_chart = [
                             'key' => $key,
                             'date' => $date,
                             'genre' => $genre,
                             'format' => $format,
-                            'region' => $region,
-                            'region_term' => $reg_slug,
                             'latest' => !empty($latest) || empty($query->get('waki_chart_date')),
                             'canonical_country' => get_post_meta($pid, '_waki_country_key', true),
                         ];
@@ -962,11 +938,8 @@ final class Waki_Charts {
         if (empty($this->resolved_chart)) return;
         $rc = $this->resolved_chart;
         if (empty($rc['canonical_country'])) return;
-        $pid = get_queried_object_id();
-        $has_country = $pid ? has_term('', 'waki_country', $pid) : false;
-        $base = $has_country ? 'country' : 'region';
         $parts = array_filter([$rc['canonical_country'], $rc['genre'], $rc['format']]);
-        $url = home_url('/' . self::CPT_SLUG . '/' . $base . '/' . implode('/', $parts) . '/');
+        $url = home_url('/' . self::CPT_SLUG . '/country/' . implode('/', $parts) . '/');
         $url .= $rc['latest'] ? 'latest' : $rc['date'] . '/';
         echo '<link rel="canonical" href="' . esc_url($url) . '" />';
     }
