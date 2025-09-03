@@ -64,6 +64,7 @@ final class Waki_Charts {
         add_action('wp_trash_post',        [$this,'remove_chart_rows']);
         add_action('before_delete_post',   [$this,'remove_chart_rows']);
 
+        add_action('template_redirect',   [$this,'redirect_legacy_chart_date']);
         add_action('template_redirect',   [$this,'maybe_redirect_chart']);
         add_action('wp_head',              [$this,'output_social_meta']);
         add_action('wp_head',              [$this,'output_chart_canonical']);
@@ -867,6 +868,24 @@ final class Waki_Charts {
             return home_url('/' . self::CPT_SLUG . '/' . $format . '/' . $week . '/');
         }
         return $permalink;
+    }
+
+    public function redirect_legacy_chart_date(){
+        if (is_admin()) return;
+
+        $path = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+        $base = self::CPT_SLUG;
+
+        if (preg_match('#^' . $base . '/([^/]+)-(\d{2}-\d{2}-\d{2})/?$#', $path, $m)) {
+            $format = sanitize_title($m[1]);
+            $dt = \DateTime::createFromFormat('y-m-d', $m[2], new \DateTimeZone(self::TZ));
+            if ($dt) {
+                $dt->modify('monday this week');
+                $url = home_url('/' . $base . '/' . $format . '/' . $dt->format('Y-m-d') . '/');
+                wp_redirect($url, 301);
+                exit;
+            }
+        }
     }
 
     public function maybe_redirect_chart(){
