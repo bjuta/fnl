@@ -81,6 +81,7 @@ final class Waki_Charts {
         $this->ensure_archive_page();
         $this->register_cpt();
         $this->register_taxonomies();
+        $this->ensure_country_terms();
         flush_rewrite_rules();
         add_option(self::ARCHIVE_INTRO, $this->default_archive_intro());
         update_option(self::SLUG . '_ver', self::VER);
@@ -176,6 +177,25 @@ final class Waki_Charts {
             KEY idx_popularity (popularity)
         ) $charset_collate;";
         dbDelta($sql2);
+    }
+
+    private function ensure_country_terms(){
+        $countries = [
+            'KE' => 'Kenya',
+            'UG' => 'Uganda',
+            'TZ' => 'Tanzania',
+            'RW' => 'Rwanda',
+            'ET' => 'Ethiopia',
+            'NG' => 'Nigeria',
+            'ZA' => 'South Africa',
+            'GH' => 'Ghana',
+        ];
+        foreach($countries as $code => $name){
+            $slug = strtolower($code);
+            if(!term_exists($slug, 'waki_country')){
+                wp_insert_term($name, 'waki_country', ['slug' => $slug]);
+            }
+        }
     }
 
     private function migrate_immutable_editions(){
