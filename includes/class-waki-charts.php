@@ -519,6 +519,10 @@ final class Waki_Charts {
         if($post->post_type!==self::CPT) return;
         if(wp_is_post_revision($post_id)) return;
 
+        $action = $_REQUEST['action'] ?? '';
+        $status = get_post_status($post_id);
+        if($status === 'trash' || $action === 'trash') return;
+
         $errors=[];
 
         $week_raw = sanitize_text_field($_POST['_waki_week_start'] ?? '');
