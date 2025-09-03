@@ -1111,6 +1111,27 @@ final class Waki_Charts {
         $opts   = $this->get_options();
         $last_error = get_option(self::SLUG.'_last_error','');
 
+        if (!empty($_POST['waki_apply_meta'])) {
+            check_admin_referer(self::SLUG.'_apply_meta');
+            $slug = $this->normalize_slug($_POST['chart_slug'] ?? '');
+            if (isset($charts[$slug])) {
+                $orig = $this->parse_chart_meta($charts[$slug]);
+                $charts[$slug]['countries'] = sanitize_text_field($_POST['meta_countries'] ?? '');
+                $charts[$slug]['region']    = sanitize_text_field($_POST['meta_region'] ?? '');
+                $charts[$slug]['genres']    = sanitize_text_field($_POST['meta_genres'] ?? '');
+                $charts[$slug]['languages'] = sanitize_text_field($_POST['meta_languages'] ?? '');
+                $charts[$slug]['format']    = sanitize_text_field($_POST['meta_format'] ?? '');
+                $corrected = $this->parse_chart_meta($charts[$slug]);
+                error_log('[WAKI Charts] Metadata override for '.$slug.' — original: '.wp_json_encode($orig).' — corrected: '.wp_json_encode($corrected));
+                $this->put_charts($charts);
+                $report = $this->dry_run_chart($slug, $charts[$slug]);
+                $key = self::SLUG.'_dry_'.$slug.'_'.get_current_user_id();
+                set_transient($key, $report, 10 * MINUTE_IN_SECONDS);
+                $url = add_query_arg(['page'=>self::SLUG,'edit_chart'=>$slug,'dry'=>1], admin_url('admin.php'));
+                wp_safe_redirect($url); exit;
+            }
+        }
+
         $editing = null;
         if (isset($_GET['edit_chart'])) { $slug=$this->normalize_slug($_GET['edit_chart']); if(isset($charts[$slug])) $editing=$charts[$slug]; }
 
@@ -2165,18 +2186,23 @@ endif; ?>
           </table>
           <?php if(!empty($report['parsed_meta'])): ?>
             <h4>Parsed Metadata</h4>
-            <table class="widefat striped">
-              <tbody>
-                <tr><th>Countries</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['countries'] ?? [])); ?></td></tr>
-                <tr><th>Region</th><td><?php echo esc_html($report['parsed_meta']['region'] ?: '—'); ?></td></tr>
-                <tr><th>Genres</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['genres'] ?? [])); ?></td></tr>
-                <tr><th>Languages</th><td><?php echo esc_html(implode(', ', $report['parsed_meta']['languages'] ?? [])); ?></td></tr>
-                <tr><th>Format</th><td><?php echo esc_html($report['parsed_meta']['format'] ?: '—'); ?></td></tr>
-                <tr><th>Country key</th><td><?php echo esc_html($report['parsed_meta']['country_key'] ?: '—'); ?></td></tr>
-                <tr><th>Chart key</th><td><?php echo esc_html($report['parsed_meta']['chart_key'] ?: '—'); ?></td></tr>
-                <tr><th>URL</th><td><?php if(!empty($report['parsed_meta']['url'])) echo '<a href="'.esc_url($report['parsed_meta']['url']).'" target="_blank">'.esc_html($report['parsed_meta']['url']).'</a>'; else echo '—'; ?></td></tr>
-              </tbody>
-            </table>
+            <form method="post" style="margin-top:8px">
+              <?php wp_nonce_field(self::SLUG.'_apply_meta'); ?>
+              <input type="hidden" name="chart_slug" value="<?php echo esc_attr($slug); ?>">
+              <table class="widefat striped">
+                <tbody>
+                  <tr><th>Countries</th><td><input type="text" name="meta_countries" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['countries'] ?? [])); ?>"></td></tr>
+                  <tr><th>Region</th><td><input type="text" name="meta_region" class="regular-text" value="<?php echo esc_attr($report['parsed_meta']['region'] ?? ''); ?>"></td></tr>
+                  <tr><th>Genres</th><td><input type="text" name="meta_genres" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['genres'] ?? [])); ?>"></td></tr>
+                  <tr><th>Languages</th><td><input type="text" name="meta_languages" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['languages'] ?? [])); ?>"></td></tr>
+                  <tr><th>Format</th><td><input type="text" name="meta_format" class="regular-text" value="<?php echo esc_attr($report['parsed_meta']['format'] ?? ''); ?>"></td></tr>
+                  <tr><th>Country key</th><td><?php echo esc_html($report['parsed_meta']['country_key'] ?: '—'); ?></td></tr>
+                  <tr><th>Chart key</th><td><?php echo esc_html($report['parsed_meta']['chart_key'] ?: '—'); ?></td></tr>
+                  <tr><th>URL</th><td><?php if(!empty($report['parsed_meta']['url'])) echo '<a href="'.esc_url($report['parsed_meta']['url']).'" target="_blank">'.esc_html($report['parsed_meta']['url']).'</a>'; else echo '—'; ?></td></tr>
+                </tbody>
+              </table>
+              <p><button class="button" name="waki_apply_meta" value="1">Apply</button></p>
+            </form>
           <?php endif; ?>
 
           <?php if(!empty($report['dedupe_sample'])): ?>
