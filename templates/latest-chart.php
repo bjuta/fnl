@@ -6,6 +6,8 @@ if (is_wp_error($genres) || !$genres) { $genres = []; }
 $languages = get_the_terms(get_the_ID(), 'waki_language');
 if (is_wp_error($languages) || !$languages) { $languages = []; }
 
+wp_enqueue_script(Waki_Charts::SLUG . '-charts');
+
 $page_title = $atts['title'];
 if ($countries) {
     $page_title = 'Top 50 ';
@@ -34,13 +36,13 @@ $atts['title'] = $page_title;
               <p class="waki-hero-sub"><?php echo sprintf(esc_html__('Featuring %s and more', 'wakilisha-charts'), esc_html($intro_artists)); ?></p>
               <div class="waki-hero-meta">
                 <?php foreach($countries as $c): $code = strtoupper($c->slug); ?>
-                  <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-filter="country:<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
+                  <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-country="<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
                 <?php endforeach; ?>
                 <?php foreach($genres as $g): ?>
-                  <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-filter="genre:<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
+                  <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-genre="<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
                 <?php endforeach; ?>
                 <?php foreach($languages as $l): ?>
-                  <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-filter="language:<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
+                  <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-language="<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
                 <?php endforeach; ?>
                 <?php if($updated){ ?><span class="waki-chip"><?php echo sprintf(esc_html__('Updated %s', 'wakilisha-charts'), esc_html($updated)); ?></span><?php } ?>
               </div>
