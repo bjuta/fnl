@@ -32,26 +32,29 @@
                     }
                   }
 
-                  $country = '';
-                  $charts  = $this->get_charts();
-                  if($key && !empty($charts[$key]['origin_filter'])){
-                    $iso = strtoupper($charts[$key]['origin_filter']);
-                    $map = $this->iso_list();
-                    $country = $map[$iso] ?? $iso;
-                  }
+                  $countries = get_the_terms($cid,'waki_country');
+                  if(is_wp_error($countries) || !$countries){ $countries = []; }
+                  $genres = get_the_terms($cid,'waki_genre');
+                  if(is_wp_error($genres) || !$genres){ $genres = []; }
+                  $languages = get_the_terms($cid,'waki_language');
+                  if(is_wp_error($languages) || !$languages){ $languages = []; }
                   $updated = get_post_modified_time(get_option('date_format'), false, $cid);
-                  $genres = [];
-                  $terms = get_the_terms($cid,'category');
-                  if($terms && !is_wp_error($terms)){
-                    $genres = wp_list_pluck($terms,'name');
-                  }
                 ?>
                 <a class="cover" href="<?php the_permalink(); ?>"<?php if($cover) echo ' style="background-image:url(\''.esc_url($cover).'\')"'; ?>></a>
                 <div class="inner">
                   <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
                   <p class="meta"><?php echo sprintf(esc_html__('Updated %s', 'wakilisha-charts'), esc_html($updated)); ?></p>
-                  <?php if($country){ ?><p class="meta"><?php echo sprintf(esc_html__('Region: %s', 'wakilisha-charts'), esc_html($country)); ?></p><?php } ?>
-                  <?php if($genres){ ?><p class="meta"><?php echo sprintf(esc_html__('Genres: %s', 'wakilisha-charts'), esc_html(implode(', ',$genres))); ?></p><?php } ?>
+                  <div class="waki-hero-meta">
+                    <?php foreach($countries as $c): $code = strtoupper($c->slug); ?>
+                      <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-filter="country:<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
+                    <?php endforeach; ?>
+                    <?php foreach($genres as $g): ?>
+                      <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-filter="genre:<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
+                    <?php endforeach; ?>
+                    <?php foreach($languages as $l): ?>
+                      <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-filter="language:<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
+                    <?php endforeach; ?>
+                  </div>
                   <a class="view-link" href="<?php the_permalink(); ?>"><?php esc_html_e('View Chart', 'wakilisha-charts'); ?></a>
                 </div>
               </article>
