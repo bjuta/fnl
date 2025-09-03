@@ -19,6 +19,7 @@ final class Waki_Charts {
     private static $instance = null;
     private $table;
     private $artist_table;
+    private $resolved_chart = null;
 
     public static function instance(){ return self::$instance ?: (self::$instance = new self()); }
 
@@ -37,6 +38,7 @@ final class Waki_Charts {
         add_action('init',                   [$this,'register_taxonomies']);
         add_action('init',                   [$this,'register_shortcodes']);
         add_action('init',                   [$this,'register_assets']);     // register (enqueue later)
+        add_action('init',                   [$this,'register_chart_rewrites']);
 
         add_action('admin_menu',             [$this,'admin_menu']);
         add_action('admin_init',             [$this,'handle_manual_run_legacy']);
@@ -63,10 +65,12 @@ final class Waki_Charts {
         add_action('before_delete_post',   [$this,'remove_chart_rows']);
 
         add_action('wp_head',              [$this,'output_social_meta']);
+        add_action('wp_head',              [$this,'output_chart_canonical']);
         add_filter('pre_get_shortlink',    [$this,'pretty_shortlink'], 10, 2);
 
         // Artist profile routing
         add_filter('query_vars',            [$this,'add_query_vars']);
+        add_action('pre_get_posts',        [$this,'resolve_chart_request']);
         add_filter('template_include',      [$this,'load_artist_template']);
 
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
@@ -84,6 +88,7 @@ final class Waki_Charts {
         $this->ensure_archive_page();
         $this->register_cpt();
         $this->register_taxonomies();
+        $this->register_chart_rewrites();
         $this->ensure_country_terms();
         flush_rewrite_rules();
         add_option(self::ARCHIVE_INTRO, $this->default_archive_intro());
@@ -604,12 +609,90 @@ final class Waki_Charts {
         add_rewrite_rule('^artist/([^/]+)/?$', 'index.php?artist_slug=$matches[1]', 'top');
     }
 
+    public function register_chart_rewrites(){
+        $base = self::CPT_SLUG;
+        add_rewrite_tag('%waki_chart_country%', '([^/]+)');
+        add_rewrite_tag('%waki_chart_region%', '([^/]+)');
+        add_rewrite_tag('%waki_chart_genre%', '([^/]+)');
+        add_rewrite_tag('%waki_chart_format%', '([^/]+)');
+        add_rewrite_tag('%waki_chart_date%', '([0-9]{4}-[0-9]{2}-[0-9]{2})');
+        add_rewrite_tag('%waki_chart_latest%', '1');
+
+        add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_date=$matches[4]', 'top');
+        add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_format=$matches[2]&waki_chart_date=$matches[3]', 'top');
+        add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_latest=1', 'top');
+        add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_format=$matches[2]&waki_chart_latest=1', 'top');
+
+        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_date=$matches[4]', 'top');
+        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_format=$matches[2]&waki_chart_date=$matches[3]', 'top');
+        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_latest=1', 'top');
+        add_rewrite_rule("^{$base}/region/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_region=$matches[1]&waki_chart_format=$matches[2]&waki_chart_latest=1', 'top');
+    }
+
     public function add_query_vars($vars){
         $vars[] = 'artist_slug';
         $vars[] = 'artist_id';
         $vars[] = 'preview';
         $vars[] = '_wpnonce';
+        $vars[] = 'waki_chart_country';
+        $vars[] = 'waki_chart_region';
+        $vars[] = 'waki_chart_genre';
+        $vars[] = 'waki_chart_format';
+        $vars[] = 'waki_chart_date';
+        $vars[] = 'waki_chart_latest';
         return $vars;
+    }
+
+    public function resolve_chart_request($query){
+        if (!is_admin() && $query->is_main_query()){
+            $country = sanitize_title($query->get('waki_chart_country'));
+            $region  = sanitize_title($query->get('waki_chart_region'));
+            $genre   = sanitize_title($query->get('waki_chart_genre'));
+            $format  = sanitize_title($query->get('waki_chart_format'));
+            $date    = sanitize_text_field($query->get('waki_chart_date'));
+            $latest  = $query->get('waki_chart_latest');
+            if ($country || $region){
+                $base = $country ?: $region;
+                $parts = array_filter([$base, $genre, $format]);
+                $key   = strtolower(implode('-', $parts));
+                if ($latest || !$date){
+                    $date = $this->get_latest_chart_date($key);
+                }
+                if ($key && $date){
+                    global $wpdb;
+                    $pid = $wpdb->get_var($wpdb->prepare("SELECT pm1.post_id FROM {$wpdb->postmeta} pm1 JOIN {$wpdb->postmeta} pm2 ON pm1.post_id=pm2.post_id WHERE pm1.meta_key='_waki_chart_key' AND pm1.meta_value=%s AND pm2.meta_key='_waki_chart_date' AND pm2.meta_value=%s LIMIT 1", $key, $date));
+                    if ($pid){
+                        $query->set('post_type', self::CPT);
+                        $query->set('p', intval($pid));
+                        $query->is_single = true;
+                        $query->is_singular = true;
+                        $this->resolved_chart = [
+                            'key' => $key,
+                            'date' => $date,
+                            'genre' => $genre,
+                            'format' => $format,
+                            'region' => $region,
+                            'latest' => !empty($latest) || empty($query->get('waki_chart_date')),
+                            'canonical_country' => get_post_meta($pid, '_waki_country_key', true),
+                        ];
+                    } else {
+                        $query->set_404();
+                    }
+                } else {
+                    $query->set_404();
+                }
+            }
+        }
+    }
+
+    public function output_chart_canonical(){
+        if (empty($this->resolved_chart)) return;
+        $rc = $this->resolved_chart;
+        if (empty($rc['region']) || empty($rc['canonical_country'])) return;
+        $parts = array_filter([$rc['canonical_country'], $rc['genre'], $rc['format']]);
+        $url = home_url('/' . self::CPT_SLUG . '/country/' . implode('/', $parts) . '/');
+        $url .= $rc['latest'] ? 'latest' : $rc['date'] . '/';
+        echo '<link rel="canonical" href="' . esc_url($url) . '" />';
     }
 
     public function load_artist_template($template){
