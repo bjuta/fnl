@@ -680,6 +680,18 @@ final class Waki_Charts {
     public function resolve_chart_request($query){
         if (!is_admin() && $query->is_main_query()){
             $country = sanitize_title($query->get('waki_chart_country'));
+            if ($country) {
+                $slugs = array_values(array_unique(array_filter(array_map('sanitize_title', explode('-', $country)))));
+                if (count($slugs) > 10) {
+                    wp_die('', 404);
+                }
+                foreach ($slugs as $slug) {
+                    if (!term_exists($slug, 'waki_country')) {
+                        wp_die('', 404);
+                    }
+                }
+                $country = implode('-', $slugs);
+            }
             $region  = sanitize_title($query->get('waki_chart_region'));
             $genre   = sanitize_title($query->get('waki_chart_genre'));
             $format  = sanitize_title($query->get('waki_chart_format'));
