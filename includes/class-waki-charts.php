@@ -34,6 +34,7 @@ final class Waki_Charts {
 
         // CPT + templates
         add_action('init',                   [$this,'register_cpt']);
+        add_action('init',                   [$this,'register_taxonomies']);
         add_action('init',                   [$this,'register_shortcodes']);
         add_action('init',                   [$this,'register_assets']);     // register (enqueue later)
 
@@ -79,6 +80,7 @@ final class Waki_Charts {
         $this->schedule_daily_cron();
         $this->ensure_archive_page();
         $this->register_cpt();
+        $this->register_taxonomies();
         flush_rewrite_rules();
         add_option(self::ARCHIVE_INTRO, $this->default_archive_intro());
         update_option(self::SLUG . '_ver', self::VER);
@@ -421,6 +423,60 @@ final class Waki_Charts {
             $i++;
         }
         return $slug;
+    }
+
+    /* ===== Taxonomies ===== */
+    public function register_taxonomies(){
+        $common = [
+            'show_ui' => true,
+            'show_in_rest' => true,
+            'show_admin_column' => true,
+        ];
+
+        register_taxonomy('waki_genre', [self::CPT], array_merge($common, [
+            'labels' => [
+                'name' => __('Genres', 'wakilisha-charts'),
+                'singular_name' => __('Genre', 'wakilisha-charts'),
+            ],
+            'rewrite' => ['slug' => 'genre', 'with_front' => false],
+            'hierarchical' => false,
+        ]));
+
+        register_taxonomy('waki_language', [self::CPT], array_merge($common, [
+            'labels' => [
+                'name' => __('Languages', 'wakilisha-charts'),
+                'singular_name' => __('Language', 'wakilisha-charts'),
+            ],
+            'rewrite' => ['slug' => 'language', 'with_front' => false],
+            'hierarchical' => false,
+        ]));
+
+        register_taxonomy('waki_format', [self::CPT], array_merge($common, [
+            'labels' => [
+                'name' => __('Formats', 'wakilisha-charts'),
+                'singular_name' => __('Format', 'wakilisha-charts'),
+            ],
+            'rewrite' => ['slug' => 'format', 'with_front' => false],
+            'hierarchical' => false,
+        ]));
+
+        register_taxonomy('waki_country', [self::CPT], array_merge($common, [
+            'labels' => [
+                'name' => __('Countries', 'wakilisha-charts'),
+                'singular_name' => __('Country', 'wakilisha-charts'),
+            ],
+            'rewrite' => ['slug' => 'country', 'with_front' => false],
+            'hierarchical' => false,
+        ]));
+
+        register_taxonomy('waki_region', [self::CPT], array_merge($common, [
+            'labels' => [
+                'name' => __('Regions', 'wakilisha-charts'),
+                'singular_name' => __('Region', 'wakilisha-charts'),
+            ],
+            'rewrite' => ['slug' => 'region', 'with_front' => false],
+            'hierarchical' => true,
+        ]));
     }
 
     /* ===== CPT ===== */
