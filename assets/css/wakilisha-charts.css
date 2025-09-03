@@ -118,6 +118,15 @@ body.single-chart nav{margin-top:0}
 .waki-arch-card .view-link:hover{background:#6ca32f}
 .waki-pager{margin:20px 0;display:flex;justify-content:center}
 
+.waki-calendar{display:flex;flex-wrap:wrap;gap:20px;margin-bottom:20px}
+.waki-cal-month{flex:1 1 220px}
+.waki-cal-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.waki-cal-table th,.waki-cal-table td{text-align:center;padding:4px}
+.waki-cal-table td a{text-decoration:none;display:block;padding:4px;border-radius:4px;color:inherit}
+.waki-cal-table td.has-chart a{background:#84c241;color:#fff}
+.waki-cal-table td.today a{border:1px solid #84c241}
+.waki-cal-table td.pad{background:transparent}
+
 @media(max-width:600px){
   section#waki-archive.waki-wrap{
     padding-left:0;
