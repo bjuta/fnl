@@ -68,12 +68,14 @@ final class Waki_Charts {
         add_action('wp_head',              [$this,'output_social_meta']);
         add_action('wp_head',              [$this,'output_chart_canonical']);
         add_filter('pre_get_shortlink',    [$this,'pretty_shortlink'], 10, 2);
+        add_filter('post_type_link',       [$this,'filter_chart_permalink'], 10, 2);
 
         // Artist profile routing
         add_filter('query_vars',            [$this,'add_query_vars']);
         add_action('pre_get_posts',        [$this,'resolve_chart_request']);
         add_filter('template_include',      [$this,'load_artist_template']);
         add_filter('template_include',      [$this,'load_taxonomy_templates']);
+        add_filter('template_include',      [$this,'load_chart_archive_template']);
 
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
         add_action('save_post_' . self::CPT,      [$this,'handle_chart_save'], 10, 3);
@@ -653,6 +655,19 @@ final class Waki_Charts {
         add_rewrite_tag('%waki_chart_date%', '([0-9]{4}-[0-9]{2}-[0-9]{2})');
         add_rewrite_tag('%waki_chart_latest%', '1');
 
+        // /charts/{format}/{YYYY-MM-DD}/ -> specific edition
+        add_rewrite_rule(
+            "^{$base}/(?!country|region)([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$",
+            'index.php?waki_chart_format=$matches[1]&waki_chart_date=$matches[2]',
+            'top'
+        );
+        // /charts/{format}/ -> format hub archive
+        add_rewrite_rule(
+            "^{$base}/(?!country|region)([^/]+)/?$",
+            'index.php?post_type=' . self::CPT . '&waki_chart_format=$matches[1]',
+            'top'
+        );
+
         add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_date=$matches[4]', 'top');
         add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([0-9]{4}-[0-9]{2}-[0-9]{2})/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_format=$matches[2]&waki_chart_date=$matches[3]', 'top');
         add_rewrite_rule("^{$base}/country/([^/]+)/([^/]+)/([^/]+)/latest/?$", 'index.php?waki_chart_country=$matches[1]&waki_chart_genre=$matches[2]&waki_chart_format=$matches[3]&waki_chart_latest=1', 'top');
@@ -755,8 +770,51 @@ final class Waki_Charts {
                 } else {
                     $query->set_404();
                 }
+            } elseif ($format && $date) {
+                $pid = 0;
+                $q = new \WP_Query([
+                    'post_type'      => self::CPT,
+                    'post_status'    => 'publish',
+                    'posts_per_page' => 1,
+                    'fields'         => 'ids',
+                    'meta_query'     => [
+                        ['key' => '_waki_format',     'value' => $format],
+                        ['key' => '_waki_week_start', 'value' => $date],
+                    ],
+                ]);
+                if ($q->have_posts()){ $pid = $q->posts[0]; }
+                if ($pid){
+                    $query->set('post_type', self::CPT);
+                    $query->set('p', intval($pid));
+                    $query->is_single = true;
+                    $query->is_singular = true;
+                    $this->resolved_chart = [
+                        'format' => $format,
+                        'date'   => $date,
+                        'latest' => false,
+                    ];
+                } else {
+                    $query->set_404();
+                }
+            } elseif ($format && $query->is_post_type_archive(self::CPT)) {
+                $mq = $query->get('meta_query') ?: [];
+                $mq[] = ['key' => '_waki_format', 'value' => $format];
+                $query->set('meta_query', $mq);
+                $query->set('meta_key', '_waki_week_start');
+                $query->set('orderby', 'meta_value');
+                $query->set('order', 'DESC');
             }
         }
+    }
+
+    public function filter_chart_permalink($permalink, $post){
+        if ($post->post_type !== self::CPT) return $permalink;
+        $format = sanitize_title(get_post_meta($post->ID, '_waki_format', true));
+        $week   = sanitize_text_field(get_post_meta($post->ID, '_waki_week_start', true));
+        if ($format && $week){
+            return home_url('/' . self::CPT_SLUG . '/' . $format . '/' . $week . '/');
+        }
+        return $permalink;
     }
 
     public function maybe_redirect_chart(){
@@ -894,6 +952,16 @@ final class Waki_Charts {
                 if (file_exists($file)) {
                     return $file;
                 }
+            }
+        }
+        return $template;
+    }
+
+    public function load_chart_archive_template($template){
+        if (is_post_type_archive(self::CPT)) {
+            $file = WAKI_CHARTS_DIR . 'templates/archive-' . self::CPT . '.php';
+            if (file_exists($file)) {
+                return $file;
             }
         }
         return $template;
@@ -3566,7 +3634,7 @@ endif; ?>
 
     /* ===== Shortcode: Archive ===== */
     public function shortcode_charts_archive($atts){
-        $atts = shortcode_atts(['per_page'=>12], $atts, 'waki_charts_archive');
+        $atts = shortcode_atts(['per_page'=>12,'format'=>''], $atts, 'waki_charts_archive');
 
         $route_key  = sanitize_text_field(get_query_var('waki_chart_key'));
         $route_date = sanitize_text_field(get_query_var('waki_chart_date'));
@@ -3578,6 +3646,7 @@ endif; ?>
 
         $paged = max(1, get_query_var('paged') ?: 1);
         $ppp = max(9, min(15, intval($atts['per_page'])));
+        $format = sanitize_title($atts['format']);
 
         $opts = $this->get_options();
         $hero_img = '';
@@ -3588,12 +3657,16 @@ endif; ?>
             $hero_img = esc_url($hero_img);
         }
 
-        $q = new WP_Query([
+        $q_args = [
             'post_type'     => self::CPT,
             'posts_per_page'=> $ppp,
             'paged'         => $paged,
             'post_status'   => 'publish',
-        ]);
+        ];
+        if ($format){
+            $q_args['meta_query'] = [[ 'key' => '_waki_format', 'value' => $format ]];
+        }
+        $q = new WP_Query($q_args);
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/charts-archive.php';
