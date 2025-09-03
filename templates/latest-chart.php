@@ -1,3 +1,29 @@
+<?php
+$countries = get_the_terms(get_the_ID(), 'waki_country');
+if (is_wp_error($countries) || !$countries) { $countries = []; }
+$genres = get_the_terms(get_the_ID(), 'waki_genre');
+if (is_wp_error($genres) || !$genres) { $genres = []; }
+$languages = get_the_terms(get_the_ID(), 'waki_language');
+if (is_wp_error($languages) || !$languages) { $languages = []; }
+
+$page_title = $atts['title'];
+if ($countries) {
+    $page_title = 'Top 50 ';
+    if (count($countries) === 1) {
+        $page_title .= $countries[0]->name;
+    } else {
+        $codes = array_map(function($t){ return strtoupper($t->slug); }, $countries);
+        $page_title .= implode(' • ', $codes);
+    }
+    $post_id = get_the_ID();
+    add_filter('pre_get_document_title', function() use ($page_title){ return $page_title; });
+    add_filter('the_title', function($t, $id) use ($page_title, $post_id){
+        return ($id === $post_id) ? $page_title : $t;
+    }, 10, 2);
+}
+$atts['title'] = $page_title;
+?>
+
 <?php if($hero && $bg): ?>
         <template id="waki-chart-hero">
           <div class="waki-chart-hero" style="--hero:url('<?php echo esc_url($bg); ?>')">
@@ -7,7 +33,15 @@
               <?php endif; ?>
               <p class="waki-hero-sub"><?php echo sprintf(esc_html__('Featuring %s and more', 'wakilisha-charts'), esc_html($intro_artists)); ?></p>
               <div class="waki-hero-meta">
-                <?php if($country){ ?><span class="waki-chip"><?php echo esc_html($country); ?></span><?php } ?>
+                <?php foreach($countries as $c): $code = strtoupper($c->slug); ?>
+                  <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-filter="country:<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
+                <?php endforeach; ?>
+                <?php foreach($genres as $g): ?>
+                  <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-filter="genre:<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
+                <?php endforeach; ?>
+                <?php foreach($languages as $l): ?>
+                  <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-filter="language:<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
+                <?php endforeach; ?>
                 <?php if($updated){ ?><span class="waki-chip"><?php echo sprintf(esc_html__('Updated %s', 'wakilisha-charts'), esc_html($updated)); ?></span><?php } ?>
               </div>
             </div>
