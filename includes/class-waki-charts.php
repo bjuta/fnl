@@ -655,12 +655,33 @@ final class Waki_Charts {
                 $base = $country ?: $region;
                 $parts = array_filter([$base, $genre, $format]);
                 $key   = strtolower(implode('-', $parts));
-                if ($latest || !$date){
-                    $date = $this->get_latest_chart_date($key);
-                }
-                if ($key && $date){
-                    global $wpdb;
-                    $pid = $wpdb->get_var($wpdb->prepare("SELECT pm1.post_id FROM {$wpdb->postmeta} pm1 JOIN {$wpdb->postmeta} pm2 ON pm1.post_id=pm2.post_id WHERE pm1.meta_key='_waki_chart_key' AND pm1.meta_value=%s AND pm2.meta_key='_waki_chart_date' AND pm2.meta_value=%s LIMIT 1", $key, $date));
+                if ($key){
+                    $pid = 0;
+                    if ($latest || !$date){
+                        $q = new \WP_Query([
+                            'post_type'      => self::CPT,
+                            'post_status'    => 'publish',
+                            'posts_per_page' => 1,
+                            'meta_key'       => '_waki_chart_date',
+                            'orderby'        => 'meta_value',
+                            'order'          => 'DESC',
+                            'fields'         => 'ids',
+                            'meta_query'     => [[ 'key'=>'_waki_chart_key','value'=>$key ]],
+                        ]);
+                        if ($q->have_posts()){ $pid = $q->posts[0]; $date = get_post_meta($pid,'_waki_chart_date',true); }
+                    } elseif ($date){
+                        $q = new \WP_Query([
+                            'post_type'      => self::CPT,
+                            'post_status'    => 'publish',
+                            'posts_per_page' => 1,
+                            'fields'         => 'ids',
+                            'meta_query'     => [
+                                ['key'=>'_waki_chart_key','value'=>$key],
+                                ['key'=>'_waki_chart_date','value'=>$date],
+                            ],
+                        ]);
+                        if ($q->have_posts()){ $pid = $q->posts[0]; }
+                    }
                     if ($pid){
                         $query->set('post_type', self::CPT);
                         $query->set('p', intval($pid));
@@ -3082,8 +3103,35 @@ endif; ?>
     }
 
     /* ===== Data accessors ===== */
-    private function get_latest_chart_date($chart_key='default'){ global $wpdb; return $wpdb->get_var($wpdb->prepare("SELECT MAX(chart_date) FROM {$this->table} WHERE chart_key=%s",$chart_key)); }
-    private function get_previous_chart_date($chart_key,$current_date){ global $wpdb; return $wpdb->get_var($wpdb->prepare("SELECT MAX(chart_date) FROM {$this->table} WHERE chart_key=%s AND chart_date < %s",$chart_key,$current_date)); }
+    private function get_latest_chart_date($chart_key='default'){
+        $q = new \WP_Query([
+            'post_type'      => self::CPT,
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'meta_key'       => '_waki_chart_date',
+            'orderby'        => 'meta_value',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'meta_query'     => [[ 'key'=>'_waki_chart_key','value'=>$chart_key ]],
+        ]);
+        return $q->have_posts() ? get_post_meta($q->posts[0],'_waki_chart_date',true) : null;
+    }
+    private function get_previous_chart_date($chart_key,$current_date){
+        $q = new \WP_Query([
+            'post_type'      => self::CPT,
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'meta_key'       => '_waki_chart_date',
+            'orderby'        => 'meta_value',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'meta_query'     => [
+                ['key'=>'_waki_chart_key','value'=>$chart_key],
+                ['key'=>'_waki_chart_date','value'=>$current_date,'compare'=>'<','type'=>'DATE'],
+            ],
+        ]);
+        return $q->have_posts() ? get_post_meta($q->posts[0],'_waki_chart_date',true) : null;
+    }
     private function get_chart_rows($chart_key,$date,$limit=0,$snapshot_id=''){
         global $wpdb;
         $sql = "SELECT * FROM {$this->table} WHERE chart_key=%s AND chart_date=%s";
@@ -3136,13 +3184,20 @@ endif; ?>
         ), ARRAY_A);
     }
     private function get_recent_dates($chart_key,$as_of_date,$limit){
-        global $wpdb;
-        return $wpdb->get_col($wpdb->prepare(
-            "SELECT DISTINCT chart_date FROM {$this->table}
-             WHERE chart_key=%s AND chart_date <= %s
-             ORDER BY chart_date DESC LIMIT %d",
-            $chart_key,$as_of_date,intval($limit)
-        ));
+        $q = new \WP_Query([
+            'post_type'      => self::CPT,
+            'post_status'    => 'publish',
+            'posts_per_page' => intval($limit),
+            'meta_key'       => '_waki_chart_date',
+            'orderby'        => 'meta_value',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'meta_query'     => [
+                ['key'=>'_waki_chart_key','value'=>$chart_key],
+                ['key'=>'_waki_chart_date','value'=>$as_of_date,'compare'=>'<=','type'=>'DATE'],
+            ],
+        ]);
+        $dates=[]; foreach($q->posts as $pid){ $dates[] = get_post_meta($pid,'_waki_chart_date',true); } return $dates;
     }
 
     /* ===== Build CPT post for each chart issue ===== */
