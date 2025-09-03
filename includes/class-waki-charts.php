@@ -69,6 +69,9 @@ final class Waki_Charts {
         add_filter('query_vars',            [$this,'add_query_vars']);
         add_filter('template_include',      [$this,'load_artist_template']);
 
+        add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
+        add_action('save_post_' . self::CPT,      [$this,'handle_chart_save'], 10, 3);
+
         if (defined('WP_CLI') && WP_CLI) {
             \WP_CLI::add_command('waki-charts reset-archive', [$this, 'cli_reset_archive']);
         }
@@ -430,6 +433,82 @@ final class Waki_Charts {
     private function normalize_many($text){
         $ids=[]; foreach(preg_split('/\R+/', (string)$text) as $line){ $line=trim($line); if(!$line) continue; $id=$this->normalize_playlist_id($line); if($id) $ids[]=$id; }
         return array_values(array_unique($ids));
+    }
+
+    private function compute_country_key($post_id){
+        $terms = get_the_terms($post_id,'waki_country');
+        if(!$terms || is_wp_error($terms)){
+            delete_post_meta($post_id,'_waki_country_key');
+            return '';
+        }
+        $slugs = array_unique(array_map(function($t){ return strtolower(sanitize_title($t->slug)); }, $terms));
+        sort($slugs, SORT_STRING);
+        $key = '';
+        $count = 0;
+        foreach($slugs as $slug){
+            $candidate = $key===''?$slug:$key.'-'.$slug;
+            if(strlen($candidate)>40 || $count>=10) break;
+            $key = $candidate;
+            $count++;
+        }
+        update_post_meta($post_id,'_waki_country_key',$key);
+        return $key;
+    }
+
+    private function compute_chart_key($post_id, $country_key=''){
+        $country_key = $country_key ?: get_post_meta($post_id,'_waki_country_key',true);
+        $genre = get_the_terms($post_id,'waki_genre');
+        $format = get_the_terms($post_id,'waki_format');
+        $genre_slug = '';
+        if($genre && !is_wp_error($genre)){ $genre_slug = strtolower(sanitize_title($genre[0]->slug)); }
+        $format_slug='';
+        if($format && !is_wp_error($format)){ $format_slug = strtolower(sanitize_title($format[0]->slug)); }
+        $parts = array_filter([$country_key,$genre_slug,$format_slug]);
+        $key = strtolower(implode('-', $parts));
+        update_post_meta($post_id,'_waki_chart_key',$key);
+        return $key;
+    }
+
+    public function handle_chart_save($post_id,$post,$update){
+        if(defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+        if($post->post_type!==self::CPT) return;
+        if(wp_is_post_revision($post_id)) return;
+
+        $country_key = $this->compute_country_key($post_id);
+        $this->compute_chart_key($post_id,$country_key);
+
+        $errors=[];
+        $countries = get_the_terms($post_id,'waki_country');
+        $regions   = get_the_terms($post_id,'waki_region');
+        if((!$countries || is_wp_error($countries)) && (!$regions || is_wp_error($regions))){
+            $errors[] = __('Assign at least one country or region.','wakilisha-charts');
+        }
+        if($countries && !is_wp_error($countries)){
+            $slugs = wp_list_pluck($countries,'slug');
+            if(count($slugs) !== count(array_unique($slugs))){
+                $errors[] = __('Countries must be unique.','wakilisha-charts');
+            }
+        }
+        foreach(['waki_genre','waki_language'] as $tax){
+            $terms = get_the_terms($post_id,$tax);
+            if($terms && is_wp_error($terms)){
+                $errors[] = sprintf(__('Unknown %s terms assigned.','wakilisha-charts'), $tax);
+            }
+        }
+        if($errors){ wp_die(implode('<br>', $errors)); }
+    }
+
+    public function add_chart_keys_meta_box(){
+        add_meta_box('waki_chart_keys', __('Chart Keys','wakilisha-charts'), [$this,'render_chart_keys_meta_box'], self::CPT, 'side', 'default');
+    }
+
+    public function render_chart_keys_meta_box($post){
+        $country_key = get_post_meta($post->ID,'_waki_country_key',true);
+        $chart_key   = get_post_meta($post->ID,'_waki_chart_key',true);
+        $url = $chart_key ? home_url('/'.self::CPT_SLUG.'/'. $chart_key .'/') : '';
+        echo '<p><strong>'.esc_html__('Country key','wakilisha-charts').":</strong><br>".esc_html($country_key ?: '-').'</p>';
+        echo '<p><strong>'.esc_html__('Chart key','wakilisha-charts').":</strong><br>".esc_html($chart_key ?: '-').'</p>';
+        if($url){ echo '<p><strong>'.esc_html__('URL preview','wakilisha-charts').":</strong><br><a href='".esc_url($url)."' target='_blank'>".esc_html($url).'</a></p>'; }
     }
 
     private function generate_artist_slug($name, $current_id = ''){
