@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-08-31 23:27+0000\n"
+"POT-Creation-Date: 2025-09-03 06:59+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -326,4 +326,8 @@ msgstr ""
 #: templates/latest-chart.php:8
 #, php-format
 msgid "Featuring %s and more"
+msgstr ""
+
+#: templates/latest-chart.php:10
+msgid "All Charts"
 msgstr ""
