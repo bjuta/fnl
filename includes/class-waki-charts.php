@@ -595,10 +595,8 @@ final class Waki_Charts {
         $format = get_the_terms($post->ID,'waki_format');
         $genre_slug = ($genre && !is_wp_error($genre)) ? strtolower(sanitize_title($genre[0]->slug)) : '';
         $format_slug = ($format && !is_wp_error($format)) ? strtolower(sanitize_title($format[0]->slug)) : '';
-        $has_country = has_term('', 'waki_country', $post->ID);
-        $base = $has_country ? 'country' : 'region';
         $path_parts = array_filter([$country_key, $genre_slug, $format_slug]);
-        $url = $country_key ? home_url('/'.self::CPT_SLUG.'/'.$base.'/'.implode('/', $path_parts).'/') : '';
+        $url = $country_key ? home_url('/'.self::CPT_SLUG.'/country/'.implode('/', $path_parts).'/') : '';
         echo '<p><strong>'.esc_html__('Country key','wakilisha-charts').":</strong><br>".esc_html($country_key ?: '-').'</p>';
         echo '<p><strong>'.esc_html__('Chart key','wakilisha-charts').":</strong><br>".esc_html($chart_key ?: '-').'</p>';
         if($url){ echo '<p><strong>'.esc_html__('URL preview','wakilisha-charts').":</strong><br><a href='".esc_url($url)."' target='_blank'>".esc_html($url).'</a></p>'; }
@@ -1290,7 +1288,6 @@ final class Waki_Charts {
             if (isset($charts[$slug])) {
                 $orig = $this->parse_chart_meta($charts[$slug]);
                 $charts[$slug]['countries'] = sanitize_text_field($_POST['meta_countries'] ?? '');
-                $charts[$slug]['region']    = sanitize_text_field($_POST['meta_region'] ?? '');
                 $charts[$slug]['genres']    = sanitize_text_field($_POST['meta_genres'] ?? '');
                 $charts[$slug]['languages'] = sanitize_text_field($_POST['meta_languages'] ?? '');
                 $charts[$slug]['format']    = sanitize_text_field($_POST['meta_format'] ?? '');
@@ -2430,7 +2427,6 @@ endif; ?>
             $errors[] = __('At most 10 unique countries allowed.','wakilisha-charts');
         }
 
-        $region    = sanitize_title($row['region'] ?? '');
         $genres    = array_values(array_unique(array_map('sanitize_title', $split($row['genres'] ?? ''))));
         foreach($genres as $slug){
             if(!term_exists($slug,'waki_genre')){
@@ -2452,13 +2448,11 @@ endif; ?>
             if(strlen($country_key) > 40){
                 $errors[] = __('Country key cannot exceed 40 characters.','wakilisha-charts');
             }
-        }elseif($region){
-            $country_key = $region;
         }
 
         if($errors){ wp_die(implode('<br>', $errors)); }
 
-        $base = $country_key ?: $region;
+        $base = $country_key;
         $first_genre = $genres[0] ?? '';
         $parts = array_filter([$base, $first_genre, $format]);
         $chart_key = strtolower(implode('-', $parts));
@@ -2467,16 +2461,12 @@ endif; ?>
         if($countries){
             $path = implode('/', array_filter([$country_key, $first_genre, $format]));
             $url = home_url('/'.self::CPT_SLUG.'/country/'.$path.'/'.($date ?: 'latest').'/');
-        }elseif($region){
-            $path = implode('/', array_filter([$region, $first_genre, $format]));
-            $url = home_url('/'.self::CPT_SLUG.'/region/'.$path.'/'.($date ?: 'latest').'/');
         }else{
             $url = '';
         }
 
         return [
             'countries'=>$countries,
-            'region'=>$region,
             'genres'=>$genres,
             'languages'=>$languages,
             'format'=>$format,
@@ -4116,10 +4106,6 @@ endif; ?>
             'dedupe_sample'=>$dedupe_sample,
             'parsed_meta'=>$meta
         ];
-    }
-
-    private function default_archive_intro(){
-        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by genre and more.', 'wakilisha-charts');
     }
 
     public function register_rest_routes(){
