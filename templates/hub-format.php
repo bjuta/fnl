@@ -36,10 +36,11 @@ $args = [
     'order'          => 'DESC',
     'meta_query'     => [
         [ 'key' => '_waki_format', 'value' => $format ],
+        [ 'key' => '_waki_week_start', 'compare' => 'EXISTS' ],
     ],
 ];
 if ($year) {
-    $args['meta_query'][] = [
+    $args['meta_query'][1] = [
         'key'     => '_waki_week_start',
         'value'   => [$year . '-01-01', $year . '-12-31'],
         'compare' => 'BETWEEN',
