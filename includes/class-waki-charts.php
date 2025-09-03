@@ -9,7 +9,7 @@ final class Waki_Charts {
     const TZ         = 'Africa/Nairobi';
     const API_BASE   = 'https://api.spotify.com';
     const AUTH_URL   = 'https://accounts.spotify.com/api/token';
-    const VER        = '3.0';
+    const VER        = '3.1';
     const ARCHIVE_INTRO = 'waki_archive_intro';
 
     // CPT

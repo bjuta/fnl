@@ -2,7 +2,7 @@
 /**
  * Description: Multi-chart ingest via Playlists or Release Window search; scoring driven by normalized track.popularity; debut/peak (with dates), weekly deltas, recent-weeks viewer, per-track position history, dry-run pipeline with validation & transparency, archive UI, manual Artist Origin (ISO-2) mapping with per-chart origin filter, full artist meta storage, single-chart hero, and Artists admin with filters/CSV import/export/sync.
  * Plugin Name: Wakilisha Charts
- * Version:     3.0
+ * Version:     3.1
  * Author:      WAKILISHA MUSIC GROUP
  * License:     GPLv2 or later
  * Text Domain: wakilisha-charts
