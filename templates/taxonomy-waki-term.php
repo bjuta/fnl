@@ -20,12 +20,15 @@ $paged = max(1, get_query_var('paged'));
 global $wpdb;
 $years = $wpdb->get_col(
     $wpdb->prepare(
-        "SELECT DISTINCT YEAR(p.post_date)
-         FROM {$wpdb->posts} p
+        "SELECT DISTINCT YEAR(pm.meta_value)
+         FROM {$wpdb->postmeta} pm
+         INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
          INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
          INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-         WHERE tt.taxonomy = %s AND tt.term_id = %d AND p.post_type = %s AND p.post_status = 'publish'
-         ORDER BY YEAR(p.post_date) DESC",
+         WHERE pm.meta_key = '_waki_week_start'
+           AND tt.taxonomy = %s AND tt.term_id = %d
+           AND p.post_type = %s AND p.post_status = 'publish'
+         ORDER BY YEAR(pm.meta_value) DESC",
         $term->taxonomy,
         $term->term_id,
         Waki_Charts::CPT
@@ -36,15 +39,26 @@ $args = [
     'post_type'      => Waki_Charts::CPT,
     'posts_per_page' => 10,
     'paged'          => $paged,
+    'meta_key'       => '_waki_week_start',
+    'orderby'        => 'meta_value',
+    'order'          => 'DESC',
     'tax_query'      => [
         [
             'taxonomy' => $term->taxonomy,
             'terms'    => $term->term_id,
         ],
     ],
+    'meta_query'    => [
+        [ 'key' => '_waki_week_start', 'compare' => 'EXISTS' ],
+    ],
 ];
 if ($year) {
-    $args['year'] = $year;
+    $args['meta_query'][0] = [
+        'key'     => '_waki_week_start',
+        'value'   => [$year . '-01-01', $year . '-12-31'],
+        'compare' => 'BETWEEN',
+        'type'    => 'DATE',
+    ];
 }
 
 $q = new WP_Query($args);

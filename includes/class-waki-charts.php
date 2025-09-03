@@ -15,6 +15,7 @@ final class Waki_Charts {
     // CPT
     const CPT        = 'wakilisha_chart';
     const CPT_SLUG   = 'charts';
+    const DAILY_CPT  = 'wakilisha_daily_chart';
 
     private static $instance = null;
     private $table;
@@ -694,6 +695,17 @@ final class Waki_Charts {
             ]
         );
 
+        register_post_type(self::DAILY_CPT, [
+            'labels'=>[
+                'name' => __('Daily Charts', 'wakilisha-charts'),
+                'singular_name' => __('Daily Chart', 'wakilisha-charts'),
+            ],
+            'public' => false,
+            'rewrite' => false,
+            'show_ui' => false,
+            'supports' => ['title','editor'],
+        ]);
+
         // Rewrite rule for artist profiles
         add_rewrite_tag('%artist_slug%', '([^/]+)');
         add_rewrite_rule('^artist/([^/]+)/?$', 'index.php?artist_slug=$matches[1]', 'top');
@@ -852,6 +864,14 @@ final class Waki_Charts {
             } elseif ($format && $query->is_post_type_archive(self::CPT)) {
                 $mq = $query->get('meta_query') ?: [];
                 $mq[] = ['key' => '_waki_format', 'value' => $format];
+                $mq[] = ['key' => '_waki_week_start', 'compare' => 'EXISTS'];
+                $query->set('meta_query', $mq);
+                $query->set('meta_key', '_waki_week_start');
+                $query->set('orderby', 'meta_value');
+                $query->set('order', 'DESC');
+            } elseif ($query->is_post_type_archive(self::CPT)) {
+                $mq = $query->get('meta_query') ?: [];
+                $mq[] = ['key' => '_waki_week_start', 'compare' => 'EXISTS'];
                 $query->set('meta_query', $mq);
                 $query->set('meta_key', '_waki_week_start');
                 $query->set('orderby', 'meta_value');
@@ -3492,27 +3512,31 @@ endif; ?>
         $title = ($chart_conf['title'] ?: 'WAKILISHA Chart');
         $post_name = sanitize_title($chart_key.'-'.$chart_date);
 
+        $dt = \DateTime::createFromFormat('Y-m-d', $chart_date, new \DateTimeZone(self::TZ));
+        $is_weekly = $dt && $dt->format('N') == 1;
+        $post_type = $is_weekly ? self::CPT : self::DAILY_CPT;
+        $status = $is_weekly ? ($publish ? 'publish' : 'draft') : 'private';
+
         $existing = get_posts([
             'name'=>$post_name,
-            'post_type'=>self::CPT,
+            'post_type'=>$post_type,
             'post_status'=>'any',
             'numberposts'=>1
         ]);
-        $status = $publish ? 'publish' : 'draft';
 
         $content = '[waki_chart chart_key="'.esc_attr($chart_key).'" chart_date="'.$chart_date.'" snapshot_id="'.esc_attr($snapshot_id).'" limit="'.intval($chart_conf['chart_limit'] ?? 100).'" fullwidth="1" history="3" show_title="0" title="'.esc_attr(($chart_conf['title'] ?: 'WAKILISHA Chart')).'"]';
 
         if ($existing){
             $post_id = $existing[0]->ID;
-            wp_update_post(['ID'=>$post_id,'post_title'=>$title,'post_status'=>$status,'post_content'=>$content,'post_type'=>self::CPT]);
+            wp_update_post(['ID'=>$post_id,'post_title'=>$title,'post_status'=>$status,'post_content'=>$content,'post_type'=>$post_type]);
         } else {
             $post_id = wp_insert_post([
                 'post_title'=>$title,
                 'post_name'=>$post_name,
-                'post_type'=>self::CPT,
+                'post_type'=>$post_type,
                 'post_status'=>$status,
                 'post_content'=>$content,
-                'post_excerpt'=> 'Weekly chart for '.$chart_conf['market'],
+                'post_excerpt'=> ($is_weekly ? 'Weekly' : 'Daily') . ' chart for '.$chart_conf['market'],
             ]);
         }
 
@@ -3521,6 +3545,9 @@ endif; ?>
             update_post_meta($post_id,'_waki_chart_date',$chart_date);
             update_post_meta($post_id,'_waki_snapshot_id',$snapshot_id);
             update_post_meta($post_id,'_waki_chart_title',($chart_conf['title'] ?: 'WAKILISHA Chart'));
+            if($is_weekly){
+                update_post_meta($post_id,'_waki_week_start',$chart_date);
+            }
             $meta = $this->parse_chart_meta($chart_conf);
             $payload = [
                 'chart_key' => $meta['chart_key'] ?? $chart_key,
@@ -3552,7 +3579,7 @@ endif; ?>
     }
 
     public function remove_chart_rows($post_id){
-        if(get_post_type($post_id)!==self::CPT) return;
+        if(!in_array(get_post_type($post_id), [self::CPT, self::DAILY_CPT], true)) return;
         $key  = get_post_meta($post_id,'_waki_chart_key',true);
         $date = get_post_meta($post_id,'_waki_chart_date',true);
         $sid  = get_post_meta($post_id,'_waki_snapshot_id',true);
@@ -3778,9 +3805,15 @@ endif; ?>
             'posts_per_page'=> $ppp,
             'paged'         => $paged,
             'post_status'   => 'publish',
+            'meta_key'      => '_waki_week_start',
+            'orderby'       => 'meta_value',
+            'order'         => 'DESC',
+            'meta_query'    => [
+                ['key' => '_waki_week_start', 'compare' => 'EXISTS'],
+            ],
         ];
         if ($format){
-            $q_args['meta_query'] = [[ 'key' => '_waki_format', 'value' => $format ]];
+            $q_args['meta_query'][] = [ 'key' => '_waki_format', 'value' => $format ];
         }
         $q = new WP_Query($q_args);
 
