@@ -129,14 +129,14 @@ body.single-chart nav{margin-top:0}
       overflow-x:auto;
       scroll-snap-type:x mandatory;
       -webkit-overflow-scrolling:touch;
-      gap:16px;
+      gap:0;
       padding-left:0;
       padding-right:0;
       scroll-padding-left:0;
       scroll-padding-right:0;
   }
   #waki-archive .waki-arch-card{
-      flex:0 0 85%;
+      flex:0 0 100%;
       scroll-snap-align:start;
   }
 }
