@@ -78,6 +78,7 @@ final class Waki_Charts {
         add_filter('template_include',      [$this,'load_chart_archive_template']);
 
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
+        add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_dates_meta_box']);
         add_action('save_post_' . self::CPT,      [$this,'handle_chart_save'], 10, 3);
 
         if (defined('WP_CLI') && WP_CLI) {
@@ -322,6 +323,16 @@ final class Waki_Charts {
             $wpdb->query("ALTER TABLE {$this->artist_table} ADD KEY idx_popularity (popularity)");
         }
 
+        // ensure postmeta indexes for chart queries
+        $pm_idx = $wpdb->get_results("SHOW INDEX FROM {$wpdb->postmeta}", ARRAY_A);
+        $pm_names = $pm_idx ? array_unique(wp_list_pluck($pm_idx,'Key_name')) : [];
+        if (!in_array('idx_waki_week_start',$pm_names,true)){
+            $wpdb->query("ALTER TABLE {$wpdb->postmeta} ADD KEY idx_waki_week_start (meta_key, meta_value(10))");
+        }
+        if (!in_array('idx_waki_year',$pm_names,true)){
+            $wpdb->query("ALTER TABLE {$wpdb->postmeta} ADD KEY idx_waki_year (meta_key, meta_value(4))");
+        }
+
         // initial artist backfill from existing rows (once)
         if (!get_option(self::SLUG.'_artists_seeded')){
             $this->seed_artists_from_rows();
@@ -491,6 +502,24 @@ final class Waki_Charts {
         if(wp_is_post_revision($post_id)) return;
 
         $errors=[];
+
+        $week_raw = sanitize_text_field($_POST['_waki_week_start'] ?? '');
+        if ($week_raw) {
+            $tz = new DateTimeZone(self::TZ);
+            $dt = DateTime::createFromFormat('Y-m-d', $week_raw, $tz);
+            if (!$dt || $dt->format('Y-m-d') !== $week_raw) {
+                $errors[] = __('Invalid week start date.','wakilisha-charts');
+            } elseif ($dt->format('N') != 1) {
+                $errors[] = __('Week start must be a Monday.','wakilisha-charts');
+            } else {
+                $week_start = $dt->format('Y-m-d');
+                $week_end   = (clone $dt)->modify('+6 days')->format('Y-m-d');
+                $week_year  = $dt->format('Y');
+            }
+        } else {
+            $errors[] = __('Week start date is required.','wakilisha-charts');
+        }
+
         $countries = get_the_terms($post_id,'waki_country');
         $regions   = get_the_terms($post_id,'waki_region');
         if((!$countries || is_wp_error($countries)) && (!$regions || is_wp_error($regions))){
@@ -517,10 +546,33 @@ final class Waki_Charts {
                 }
             }
         }
+        $format_terms = get_the_terms($post_id,'waki_format');
+        if(!$format_terms || is_wp_error($format_terms)){
+            $errors[] = __('Assign a format.','wakilisha-charts');
+        } else {
+            $format_slug = sanitize_title($format_terms[0]->slug);
+        }
         if($errors){ wp_die(implode('<br>', $errors)); }
+        if(isset($week_start)) update_post_meta($post_id,'_waki_week_start',$week_start);
+        if(isset($week_end))   update_post_meta($post_id,'_waki_week_end',$week_end);
+        if(isset($week_year))  update_post_meta($post_id,'_waki_year',$week_year);
+        if(isset($format_slug)) update_post_meta($post_id,'_waki_format',$format_slug);
 
         $country_key = $this->compute_country_key($post_id);
         $this->compute_chart_key($post_id,$country_key);
+    }
+
+    public function add_chart_dates_meta_box(){
+        add_meta_box('waki_chart_dates', __('Chart Dates','wakilisha-charts'), [$this,'render_chart_dates_meta_box'], self::CPT, 'side', 'default');
+    }
+
+    public function render_chart_dates_meta_box($post){
+        $start = get_post_meta($post->ID,'_waki_week_start', true);
+        $end   = get_post_meta($post->ID,'_waki_week_end', true);
+        $year  = get_post_meta($post->ID,'_waki_year', true);
+        echo '<p><label>'.esc_html__('Week start','wakilisha-charts').'</label><br><input type="date" name="_waki_week_start" value="'.esc_attr($start).'"></p>';
+        echo '<p><label>'.esc_html__('Week end','wakilisha-charts').'</label><br><input type="text" name="_waki_week_end" value="'.esc_attr($end).'" readonly></p>';
+        echo '<p><label>'.esc_html__('Year','wakilisha-charts').'</label><br><input type="text" name="_waki_year" value="'.esc_attr($year).'" readonly></p>';
     }
 
     public function add_chart_keys_meta_box(){
