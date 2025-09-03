@@ -878,6 +878,7 @@ final class Waki_Charts {
         $base = plugin_dir_url(WAKI_CHARTS_PLUGIN_FILE);
         wp_register_style(self::SLUG, $base . 'assets/css/wakilisha-charts.css', [], self::VER);
         wp_register_script(self::SLUG, $base . 'assets/js/wakilisha-charts.js', [], self::VER, true);
+        wp_register_script(self::SLUG . '-charts', $base . 'assets/js/charts.js', [], self::VER, true);
     }
 
     public function maybe_enqueue_assets(){
