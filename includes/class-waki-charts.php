@@ -489,13 +489,6 @@ final class Waki_Charts {
             return $key;
         }
 
-        $regions = get_the_terms($post_id,'waki_region');
-        if($regions && !is_wp_error($regions) && count($regions) === 1){
-            $slug = strtolower(sanitize_title($regions[0]->slug));
-            update_post_meta($post_id,'_waki_country_key',$slug);
-            return $slug;
-        }
-
         delete_post_meta($post_id,'_waki_country_key');
         return '';
     }
@@ -543,18 +536,12 @@ final class Waki_Charts {
         }
 
         $countries = get_the_terms($post_id,'waki_country');
-        $regions   = get_the_terms($post_id,'waki_region');
-        if((!$countries || is_wp_error($countries)) && (!$regions || is_wp_error($regions))){
-            $errors[] = __('Assign at least one country or region.','wakilisha-charts');
-        }
-        if($countries && !is_wp_error($countries)){
+        if(!$countries || is_wp_error($countries)){
+            $errors[] = __('Assign at least one country.','wakilisha-charts');
+        }else{
             $slugs = wp_list_pluck($countries,'slug');
             if(count($slugs) !== count(array_unique($slugs))){
                 $errors[] = __('Countries must be unique.','wakilisha-charts');
-            }
-        }elseif($regions && !is_wp_error($regions)){
-            if(count($regions) !== 1){
-                $errors[] = __('Exactly one region is required when no countries are set.','wakilisha-charts');
             }
         }
         foreach(['waki_genre','waki_language'] as $tax){
