@@ -2,16 +2,75 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Render breadcrumbs for Waki Charts posts.
+ * Render breadcrumbs for Waki Charts posts or taxonomy archives.
  *
- * Prefers `waki_country` terms and lists ISO-2 codes. When no countries are
- * assigned it falls back to the `waki_region` hierarchy.
+ * For posts it prefers `waki_country` terms and lists ISO-2 codes. When no
+ * countries are assigned it falls back to the `waki_region` hierarchy.
+ * For taxonomy archives it outputs a simple trail of the taxonomy and term
+ * hierarchy.
  *
- * @param int|\WP_Post|null $post Optional. Post object or ID. Defaults to global post.
+ * @param int|\WP_Post|\WP_Term|null $object Optional. Post or term object/ID.
  * @return void Outputs HTML navigation list of breadcrumbs.
  */
-function waki_chart_breadcrumbs($post = null){
-    $post = get_post($post);
+function waki_chart_breadcrumbs($object = null){
+    // Term archive breadcrumbs.
+    if ($object instanceof WP_Term || (is_tax() && !$object)) {
+        $term = $object instanceof WP_Term ? $object : get_queried_object();
+        if (!$term || is_wp_error($term)) {
+            return;
+        }
+
+        $crumbs = [];
+
+        // Charts archive page
+        $archive_url = home_url('/' . Waki_Charts::CPT_SLUG . '/');
+        $crumbs[] = [
+            'label' => __('Charts', 'wakilisha-charts'),
+            'url'   => $archive_url,
+        ];
+
+        $tax = get_taxonomy($term->taxonomy);
+        if ($tax && isset($tax->labels->singular_name)) {
+            $crumbs[] = [
+                'label' => $tax->labels->singular_name,
+                'url'   => '',
+            ];
+        }
+
+        if (is_taxonomy_hierarchical($term->taxonomy)) {
+            $ancestors = array_reverse(get_ancestors($term->term_id, $term->taxonomy));
+            foreach ($ancestors as $ancestor_id) {
+                $ancestor = get_term($ancestor_id, $term->taxonomy);
+                if ($ancestor && !is_wp_error($ancestor)) {
+                    $crumbs[] = [
+                        'label' => $ancestor->name,
+                        'url'   => get_term_link($ancestor),
+                    ];
+                }
+            }
+        }
+
+        $crumbs[] = [
+            'label' => $term->name,
+            'url'   => '',
+        ];
+
+        $parts = [];
+        $total = count($crumbs) - 1; // last index
+        foreach ($crumbs as $i => $c) {
+            $label = esc_html($c['label']);
+            if (!empty($c['url']) && $i !== $total) {
+                $parts[] = '<a href="' . esc_url($c['url']) . '">' . $label . '</a>';
+            } else {
+                $parts[] = '<span class="current">' . $label . '</span>';
+            }
+        }
+
+        echo '<nav class="waki-breadcrumbs">' . implode(' &rsaquo; ', $parts) . '</nav>';
+        return;
+    }
+
+    $post = get_post($object);
     if (!$post) {
         return;
     }
@@ -21,14 +80,14 @@ function waki_chart_breadcrumbs($post = null){
     // Home
     $crumbs[] = [
         'label' => get_bloginfo('name'),
-        'url'   => home_url('/')
+        'url'   => home_url('/'),
     ];
 
     // Charts archive page
     $archive_url = home_url('/' . Waki_Charts::CPT_SLUG . '/');
     $crumbs[] = [
         'label' => __('Charts', 'wakilisha-charts'),
-        'url'   => $archive_url
+        'url'   => $archive_url,
     ];
 
     $countries = get_the_terms($post, 'waki_country');
@@ -36,7 +95,7 @@ function waki_chart_breadcrumbs($post = null){
         foreach ($countries as $country) {
             $crumbs[] = [
                 'label' => strtoupper($country->slug),
-                'url'   => get_term_link($country)
+                'url'   => get_term_link($country),
             ];
         }
     } else {
@@ -49,13 +108,13 @@ function waki_chart_breadcrumbs($post = null){
                 if ($ancestor && !is_wp_error($ancestor)) {
                     $crumbs[] = [
                         'label' => $ancestor->name,
-                        'url'   => get_term_link($ancestor)
+                        'url'   => get_term_link($ancestor),
                     ];
                 }
             }
             $crumbs[] = [
                 'label' => $region->name,
-                'url'   => get_term_link($region)
+                'url'   => get_term_link($region),
             ];
         }
     }
@@ -63,7 +122,7 @@ function waki_chart_breadcrumbs($post = null){
     // Current post
     $crumbs[] = [
         'label' => get_the_title($post),
-        'url'   => get_permalink($post)
+        'url'   => get_permalink($post),
     ];
 
     $parts = [];

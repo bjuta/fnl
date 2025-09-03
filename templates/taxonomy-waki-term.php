@@ -14,7 +14,9 @@ if (!$term) {
     return;
 }
 
-$year  = isset($_GET['year']) ? intval($_GET['year']) : 0;
+$year_param_set = isset($_GET['year']);
+$year  = $year_param_set ? intval($_GET['year']) : 0;
+$format = isset($_GET['format']) ? sanitize_title($_GET['format']) : '';
 $paged = max(1, get_query_var('paged'));
 
 global $wpdb;
@@ -35,6 +37,30 @@ $years = $wpdb->get_col(
     )
 );
 
+if (!$year_param_set && $years) {
+    $year = (int) $years[0];
+}
+
+$formats = get_terms([
+    'taxonomy'   => 'waki_format',
+    'hide_empty' => false,
+]);
+
+$meta_query = [
+    [ 'key' => '_waki_week_start', 'compare' => 'EXISTS' ],
+];
+if ($year) {
+    $meta_query[] = [
+        'key'     => '_waki_week_start',
+        'value'   => [$year . '-01-01', $year . '-12-31'],
+        'compare' => 'BETWEEN',
+        'type'    => 'DATE',
+    ];
+}
+if ($format) {
+    $meta_query[] = [ 'key' => '_waki_format', 'value' => $format ];
+}
+
 $args = [
     'post_type'      => Waki_Charts::CPT,
     'posts_per_page' => 10,
@@ -48,34 +74,36 @@ $args = [
             'terms'    => $term->term_id,
         ],
     ],
-    'meta_query'    => [
-        [ 'key' => '_waki_week_start', 'compare' => 'EXISTS' ],
-    ],
+    'meta_query'    => $meta_query,
 ];
-if ($year) {
-    $args['meta_query'][0] = [
-        'key'     => '_waki_week_start',
-        'value'   => [$year . '-01-01', $year . '-12-31'],
-        'compare' => 'BETWEEN',
-        'type'    => 'DATE',
-    ];
-}
 
 $q = new WP_Query($args);
 ?>
 
+<?php waki_chart_breadcrumbs($term); ?>
 <section class="waki-wrap waki-fw">
     <header class="waki-term-header">
         <h1><?php echo esc_html($term->name); ?></h1>
-        <?php if ($years) : ?>
-            <form method="get" id="waki-year-filter">
-                <label for="waki-year-select"><?php esc_html_e('Year:', 'wakilisha-charts'); ?></label>
-                <select id="waki-year-select" name="year" onchange="document.getElementById('waki-year-filter').submit();">
-                    <option value=""><?php esc_html_e('All Years', 'wakilisha-charts'); ?></option>
-                    <?php foreach ($years as $y) : ?>
-                        <option value="<?php echo esc_attr($y); ?>"<?php selected($year, (int) $y); ?>><?php echo esc_html($y); ?></option>
-                    <?php endforeach; ?>
-                </select>
+        <?php if ($years || $formats) : ?>
+            <form method="get" id="waki-term-filters">
+                <?php if ($years) : ?>
+                    <label for="waki-year-select"><?php esc_html_e('Year:', 'wakilisha-charts'); ?></label>
+                    <select id="waki-year-select" name="year" onchange="document.getElementById('waki-term-filters').submit();">
+                        <option value=""><?php esc_html_e('All Years', 'wakilisha-charts'); ?></option>
+                        <?php foreach ($years as $y) : ?>
+                            <option value="<?php echo esc_attr($y); ?>"<?php selected($year, (int) $y); ?>><?php echo esc_html($y); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php endif; ?>
+                <?php if ($formats && !is_tax('waki_format')) : ?>
+                    <label for="waki-format-select"><?php esc_html_e('Format:', 'wakilisha-charts'); ?></label>
+                    <select id="waki-format-select" name="format" onchange="document.getElementById('waki-term-filters').submit();">
+                        <option value=""><?php esc_html_e('All Formats', 'wakilisha-charts'); ?></option>
+                        <?php foreach ($formats as $f) : ?>
+                            <option value="<?php echo esc_attr($f->slug); ?>"<?php selected($format, $f->slug); ?>><?php echo esc_html($f->name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php endif; ?>
             </form>
         <?php endif; ?>
     </header>
@@ -103,3 +131,4 @@ $q = new WP_Query($args);
 </section>
 
 <?php get_footer();
+
