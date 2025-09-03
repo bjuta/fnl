@@ -73,6 +73,7 @@ final class Waki_Charts {
         add_filter('query_vars',            [$this,'add_query_vars']);
         add_action('pre_get_posts',        [$this,'resolve_chart_request']);
         add_filter('template_include',      [$this,'load_artist_template']);
+        add_filter('template_include',      [$this,'load_taxonomy_templates']);
 
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
         add_action('save_post_' . self::CPT,      [$this,'handle_chart_save'], 10, 3);
@@ -567,7 +568,7 @@ final class Waki_Charts {
                 'singular_name' => __('Genre', 'wakilisha-charts'),
             ],
             'rewrite' => ['slug' => 'genre', 'with_front' => false],
-            'hierarchical' => false,
+            'hierarchical' => true,
         ]));
 
         register_taxonomy('waki_language', [self::CPT], array_merge($common, [
@@ -880,6 +881,19 @@ final class Waki_Charts {
                 wp_enqueue_style(self::SLUG);
                 wp_enqueue_script(self::SLUG);
                 return WAKI_CHARTS_DIR . 'templates/artist-profile.php';
+            }
+        }
+        return $template;
+    }
+
+    public function load_taxonomy_templates($template){
+        if (is_tax(['waki_genre','waki_language','waki_format','waki_country','waki_region'])) {
+            $tax = get_queried_object();
+            if ($tax && isset($tax->taxonomy)) {
+                $file = WAKI_CHARTS_DIR . 'templates/taxonomy-' . $tax->taxonomy . '.php';
+                if (file_exists($file)) {
+                    return $file;
+                }
             }
         }
         return $template;
