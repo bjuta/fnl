@@ -607,6 +607,16 @@ final class Waki_Charts {
             'menu_icon'=>'dashicons-chart-line',
             'supports'=>['title','editor','thumbnail','excerpt','author'],
         ]);
+        register_post_meta(
+            self::CPT,
+            'waki_chart_payload',
+            [
+                'type'         => 'string',
+                'single'       => true,
+                'show_in_rest' => true,
+                'auth_callback'=> '__return_true',
+            ]
+        );
 
         // Rewrite rule for artist profiles
         add_rewrite_tag('%artist_slug%', '([^/]+)');
@@ -3257,6 +3267,15 @@ endif; ?>
             update_post_meta($post_id,'_waki_chart_date',$chart_date);
             update_post_meta($post_id,'_waki_snapshot_id',$snapshot_id);
             update_post_meta($post_id,'_waki_chart_title',($chart_conf['title'] ?: 'WAKILISHA Chart'));
+            $meta = $this->parse_chart_meta($chart_conf);
+            $payload = [
+                'chart_key' => $meta['chart_key'] ?? $chart_key,
+                'countries' => array_values($meta['countries'] ?? []),
+                'genres' => array_values($meta['genres'] ?? []),
+                'languages' => array_values($meta['languages'] ?? []),
+                'format' => $meta['format'] ? [$meta['format']] : [],
+            ];
+            update_post_meta($post_id,'waki_chart_payload', wp_json_encode($payload));
             if(!empty($rows) && !empty($rows[0]['album_image_url'])){
                 $cover_url = $rows[0]['album_image_url'];
                 update_post_meta($post_id,'_waki_cover_url',$cover_url);
