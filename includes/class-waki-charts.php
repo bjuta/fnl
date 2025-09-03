@@ -442,21 +442,29 @@ final class Waki_Charts {
 
     private function compute_country_key($post_id){
         $terms = get_the_terms($post_id,'waki_country');
-        if(!$terms || is_wp_error($terms)){
-            delete_post_meta($post_id,'_waki_country_key');
-            return '';
+        if($terms && !is_wp_error($terms)){
+            $slugs = array_unique(array_map(function($t){ return strtolower(sanitize_title($t->slug)); }, $terms));
+            sort($slugs, SORT_STRING);
+            if (count($slugs) > 10){
+                wp_die(__('At most 10 unique countries allowed.', 'wakilisha-charts'));
+            }
+            $key = implode('-', $slugs);
+            if(strlen($key) > 40){
+                wp_die(__('Country key cannot exceed 40 characters.', 'wakilisha-charts'));
+            }
+            update_post_meta($post_id,'_waki_country_key',$key);
+            return $key;
         }
-        $slugs = array_unique(array_map(function($t){ return strtolower(sanitize_title($t->slug)); }, $terms));
-        sort($slugs, SORT_STRING);
-        if (count($slugs) > 10){
-            wp_die(__('At most 10 unique countries allowed.', 'wakilisha-charts'));
+
+        $regions = get_the_terms($post_id,'waki_region');
+        if($regions && !is_wp_error($regions) && count($regions) === 1){
+            $slug = strtolower(sanitize_title($regions[0]->slug));
+            update_post_meta($post_id,'_waki_country_key',$slug);
+            return $slug;
         }
-        $key = implode('-', $slugs);
-        if(strlen($key) > 40){
-            wp_die(__('Country key cannot exceed 40 characters.', 'wakilisha-charts'));
-        }
-        update_post_meta($post_id,'_waki_country_key',$key);
-        return $key;
+
+        delete_post_meta($post_id,'_waki_country_key');
+        return '';
     }
 
     private function compute_chart_key($post_id, $country_key=''){
@@ -489,6 +497,10 @@ final class Waki_Charts {
             if(count($slugs) !== count(array_unique($slugs))){
                 $errors[] = __('Countries must be unique.','wakilisha-charts');
             }
+        }elseif($regions && !is_wp_error($regions)){
+            if(count($regions) !== 1){
+                $errors[] = __('Exactly one region is required when no countries are set.','wakilisha-charts');
+            }
         }
         foreach(['waki_genre','waki_language'] as $tax){
             $raw = $_POST['tax_input'][$tax] ?? [];
@@ -514,7 +526,14 @@ final class Waki_Charts {
     public function render_chart_keys_meta_box($post){
         $country_key = get_post_meta($post->ID,'_waki_country_key',true);
         $chart_key   = get_post_meta($post->ID,'_waki_chart_key',true);
-        $url = $chart_key ? home_url('/'.self::CPT_SLUG.'/'. $chart_key .'/') : '';
+        $genre = get_the_terms($post->ID,'waki_genre');
+        $format = get_the_terms($post->ID,'waki_format');
+        $genre_slug = ($genre && !is_wp_error($genre)) ? strtolower(sanitize_title($genre[0]->slug)) : '';
+        $format_slug = ($format && !is_wp_error($format)) ? strtolower(sanitize_title($format[0]->slug)) : '';
+        $has_country = has_term('', 'waki_country', $post->ID);
+        $base = $has_country ? 'country' : 'region';
+        $path_parts = array_filter([$country_key, $genre_slug, $format_slug]);
+        $url = $country_key ? home_url('/'.self::CPT_SLUG.'/'.$base.'/'.implode('/', $path_parts).'/') : '';
         echo '<p><strong>'.esc_html__('Country key','wakilisha-charts').":</strong><br>".esc_html($country_key ?: '-').'</p>';
         echo '<p><strong>'.esc_html__('Chart key','wakilisha-charts').":</strong><br>".esc_html($chart_key ?: '-').'</p>';
         if($url){ echo '<p><strong>'.esc_html__('URL preview','wakilisha-charts').":</strong><br><a href='".esc_url($url)."' target='_blank'>".esc_html($url).'</a></p>'; }
@@ -729,9 +748,12 @@ final class Waki_Charts {
     public function output_chart_canonical(){
         if (empty($this->resolved_chart)) return;
         $rc = $this->resolved_chart;
-        if (empty($rc['region']) || empty($rc['canonical_country'])) return;
+        if (empty($rc['canonical_country'])) return;
+        $pid = get_queried_object_id();
+        $has_country = $pid ? has_term('', 'waki_country', $pid) : false;
+        $base = $has_country ? 'country' : 'region';
         $parts = array_filter([$rc['canonical_country'], $rc['genre'], $rc['format']]);
-        $url = home_url('/' . self::CPT_SLUG . '/country/' . implode('/', $parts) . '/');
+        $url = home_url('/' . self::CPT_SLUG . '/' . $base . '/' . implode('/', $parts) . '/');
         $url .= $rc['latest'] ? 'latest' : $rc['date'] . '/';
         echo '<link rel="canonical" href="' . esc_url($url) . '" />';
     }
@@ -2188,6 +2210,8 @@ endif; ?>
             if(strlen($country_key) > 40){
                 $errors[] = __('Country key cannot exceed 40 characters.','wakilisha-charts');
             }
+        }elseif($region){
+            $country_key = $region;
         }
 
         if($errors){ wp_die(implode('<br>', $errors)); }
@@ -2198,7 +2222,7 @@ endif; ?>
         $chart_key = strtolower(implode('-', $parts));
 
         $date = $this->safe_date($row['chart_date'] ?? '');
-        if($country_key){
+        if($countries){
             $path = implode('/', array_filter([$country_key, $first_genre, $format]));
             $url = home_url('/'.self::CPT_SLUG.'/country/'.$path.'/'.($date ?: 'latest').'/');
         }elseif($region){
