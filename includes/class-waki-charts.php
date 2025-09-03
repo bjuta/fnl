@@ -3888,7 +3888,7 @@ endif; ?>
             </div>
             <div class="waki-vbar" aria-hidden="true"></div>
             <?php if($has_thumb): ?>
-              <div class="waki-entry-thumb"><img src="<?php echo $thumb; ?>" alt="" loading="lazy"></div>
+              <div class="waki-entry-thumb"><img src="<?php echo $thumb; ?>" alt="<?php echo esc_attr($title.' — '.$artist); ?>" loading="lazy"></div>
             <?php endif; ?>
             <div class="waki-entry-main" title="<?php echo esc_attr($title.' — '.$artist); ?>">
               <div class="ttl"><?php echo esc_html($title); ?></div>
