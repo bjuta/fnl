@@ -13,7 +13,11 @@ for ($m = 1; $m <= 12; $m++):
     <table class="waki-cal-table">
       <thead>
         <tr>
-          <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+<?php
+          for ($i = 1; $i <= 7; $i++) {
+              echo '<th>' . esc_html(date_i18n('D', strtotime('Sunday +' . $i . ' days'))) . '</th>';
+          }
+?>
         </tr>
       </thead>
       <tbody>
