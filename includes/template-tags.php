@@ -4,8 +4,8 @@ if (!defined('ABSPATH')) exit;
 /**
  * Render breadcrumbs for Waki Charts posts or taxonomy archives.
  *
- * For posts it prefers `waki_country` terms and lists ISO-2 codes. When no
- * countries are assigned it falls back to the `waki_region` hierarchy.
+ * For posts it prefers `waki_country` terms and lists ISO-2 codes. If no
+ * countries are assigned the trail stops at the global "Charts" archive.
  * For taxonomy archives it outputs a simple trail of the taxonomy and term
  * hierarchy.
  *
@@ -98,38 +98,33 @@ function waki_chart_breadcrumbs($object = null){
                 'url'   => get_term_link($country),
             ];
         }
-    } else {
-        $regions = get_the_terms($post, 'waki_region');
-        if (!is_wp_error($regions) && $regions) {
-            $region = $regions[0];
-            $ancestors = array_reverse(get_ancestors($region->term_id, 'waki_region'));
-            foreach ($ancestors as $ancestor_id) {
-                $ancestor = get_term($ancestor_id, 'waki_region');
-                if ($ancestor && !is_wp_error($ancestor)) {
-                    $crumbs[] = [
-                        'label' => $ancestor->name,
-                        'url'   => get_term_link($ancestor),
-                    ];
-                }
+
+        // Current post
+        $crumbs[] = [
+            'label' => get_the_title($post),
+            'url'   => get_permalink($post),
+        ];
+
+        $parts = [];
+        $total = count($crumbs) - 1; // last index
+        foreach ($crumbs as $i => $c) {
+            $label = esc_html($c['label']);
+            if (!empty($c['url']) && $i !== $total) {
+                $parts[] = '<a href="' . esc_url($c['url']) . '">' . $label . '</a>';
+            } else {
+                $parts[] = '<span class="current">' . $label . '</span>';
             }
-            $crumbs[] = [
-                'label' => $region->name,
-                'url'   => get_term_link($region),
-            ];
         }
+
+        echo '<nav class="waki-breadcrumbs">' . implode(' &rsaquo; ', $parts) . '</nav>';
+        return;
     }
 
-    // Current post
-    $crumbs[] = [
-        'label' => get_the_title($post),
-        'url'   => get_permalink($post),
-    ];
-
+    // No countries assigned, only output global Charts breadcrumb.
     $parts = [];
-    $total = count($crumbs) - 1; // last index
-    foreach ($crumbs as $i => $c) {
+    foreach ($crumbs as $c) {
         $label = esc_html($c['label']);
-        if (!empty($c['url']) && $i !== $total) {
+        if (!empty($c['url'])) {
             $parts[] = '<a href="' . esc_url($c['url']) . '">' . $label . '</a>';
         } else {
             $parts[] = '<span class="current">' . $label . '</span>';
