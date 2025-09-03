@@ -43,21 +43,22 @@
                 $lang_attr = implode(' ', array_map(fn($t)=>$t->slug, $languages));
               ?>
                 <article class="waki-arch-card" data-chart-item data-country="<?php echo esc_attr($country_attr); ?>" data-genre="<?php echo esc_attr($genre_attr); ?>" data-language="<?php echo esc_attr($lang_attr); ?>">
-                  <a class="cover" href="<?php the_permalink(); ?>"<?php if($cover) echo ' style="background-image:url(\''.esc_url($cover).'\')"'; ?>></a>
+                  <a class="cover" href="<?php the_permalink(); ?>"<?php if($cover) echo ' style="background-image:url(\''.esc_url($cover).'\')"'; ?>>
+                    <div class="waki-hero-meta">
+                      <?php foreach($countries as $c): $code = strtoupper($c->slug); ?>
+                        <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-country="<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
+                      <?php endforeach; ?>
+                      <?php foreach($genres as $g): ?>
+                        <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-genre="<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
+                      <?php endforeach; ?>
+                      <?php foreach($languages as $l): ?>
+                        <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-language="<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
+                      <?php endforeach; ?>
+                    </div>
+                  </a>
                   <div class="inner">
                   <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
                   <p class="meta"><?php echo sprintf(esc_html__('Updated %s', 'wakilisha-charts'), esc_html($updated)); ?></p>
-                  <div class="waki-hero-meta">
-                    <?php foreach($countries as $c): $code = strtoupper($c->slug); ?>
-                      <a class="waki-chip" href="?country=<?php echo esc_attr($code); ?>" data-country="<?php echo esc_attr($code); ?>"><?php echo esc_html($code); ?></a>
-                    <?php endforeach; ?>
-                    <?php foreach($genres as $g): ?>
-                      <a class="waki-chip" href="?genre=<?php echo esc_attr($g->slug); ?>" data-genre="<?php echo esc_attr($g->slug); ?>"><?php echo esc_html($g->name); ?></a>
-                    <?php endforeach; ?>
-                    <?php foreach($languages as $l): ?>
-                      <a class="waki-chip" href="?language=<?php echo esc_attr($l->slug); ?>" data-language="<?php echo esc_attr($l->slug); ?>"><?php echo esc_html($l->name); ?></a>
-                    <?php endforeach; ?>
-                  </div>
                   <a class="view-link" href="<?php the_permalink(); ?>"><?php esc_html_e('View Chart', 'wakilisha-charts'); ?></a>
                 </div>
               </article>
