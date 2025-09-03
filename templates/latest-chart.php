@@ -7,6 +7,7 @@
               <?php endif; ?>
               <p class="waki-hero-sub"><?php echo sprintf(esc_html__('Featuring %s and more', 'wakilisha-charts'), esc_html($intro_artists)); ?></p>
               <div class="waki-hero-meta">
+                <?php if($archive_url){ ?><a class="waki-chip" href="<?php echo esc_url($archive_url); ?>"><?php esc_html_e('All Charts', 'wakilisha-charts'); ?></a><?php } ?>
                 <?php if($country){ ?><span class="waki-chip"><?php echo esc_html($country); ?></span><?php } ?>
                 <?php if($updated){ ?><span class="waki-chip"><?php echo sprintf(esc_html__('Updated %s', 'wakilisha-charts'), esc_html($updated)); ?></span><?php } ?>
               </div>

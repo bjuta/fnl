@@ -3040,6 +3040,13 @@ endif; ?>
             $country = $map[$iso] ?? $iso;
         }
         $updated = $post ? get_post_modified_time(get_option('date_format'), false, $post) : '';
+        $archive_url = get_post_type_archive_link(self::CPT);
+        if(!$archive_url){
+            $page_id = intval($opts['charts_archive_page_id'] ?? 0);
+            if($page_id){
+                $archive_url = get_permalink($page_id);
+            }
+        }
 
         ob_start();
         include WAKI_CHARTS_DIR . 'templates/latest-chart.php';
