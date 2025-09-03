@@ -19,5 +19,6 @@ add_action('init', function(){
 });
 
 require_once WAKI_CHARTS_DIR . 'includes/class-waki-charts.php';
+require_once WAKI_CHARTS_DIR . 'includes/template-tags.php';
 
 Waki_Charts::instance();
