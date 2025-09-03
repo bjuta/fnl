@@ -1065,7 +1065,21 @@ final class Waki_Charts {
 
     public function maybe_enqueue_assets(){
         $enqueue = false;
-        if (is_singular(self::CPT) || is_post_type_archive(self::CPT)) $enqueue = true;
+        $enqueue_cal = false;
+
+        if (is_singular(self::CPT)) {
+            $enqueue = true;
+            $enqueue_cal = true;
+        } elseif (is_post_type_archive(self::CPT)) {
+            $enqueue = true;
+            if (get_query_var('waki_chart_format')) {
+                $enqueue_cal = true; // hub-format template shows calendar
+            }
+        } elseif (is_404() && get_query_var('waki_chart_format') && get_query_var('waki_chart_date')) {
+            $enqueue = true;
+            $enqueue_cal = true; // chart single resolved from query vars
+        }
+
         $p = get_post();
         if (get_query_var('artist_slug') || get_query_var('artist_id')) $enqueue = true;
         if (
@@ -1077,11 +1091,17 @@ final class Waki_Charts {
         ) {
             $enqueue = true;
         }
+        if ($p && has_shortcode($p->post_content ?? '', 'waki_chart_calendar')) {
+            $enqueue = true;
+            $enqueue_cal = true;
+        }
 
         if ($enqueue){
             wp_enqueue_style(self::SLUG);
             wp_enqueue_script(self::SLUG);
-            wp_enqueue_script(self::SLUG . '-calendar');
+            if ($enqueue_cal) {
+                wp_enqueue_script(self::SLUG . '-calendar');
+            }
         }
     }
 
