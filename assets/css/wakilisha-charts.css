@@ -109,7 +109,9 @@ body.single-chart nav{margin-top:0}
 .waki-archive-hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.45) 40%, rgba(0,0,0,.85));}
 #waki-archive .waki-archive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
 .waki-arch-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;color:#111}
-.waki-arch-card .cover{padding-top:56%;background-size:cover;background-position:center}
+.waki-arch-card .cover{position:relative;padding-top:56%;background-size:cover;background-position:center}
+.waki-arch-card .cover .waki-hero-meta{position:absolute;left:8px;bottom:8px;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+.waki-arch-card .cover .waki-chip{background:rgba(0,0,0,.6);color:#fff;border-color:rgba(255,255,255,.2)}
 .waki-arch-card .inner{padding:16px;display:flex;flex-direction:column;flex:1}
 .waki-arch-card h3{margin:0 0 8px;font-size:20px}
 .waki-arch-card h3 a{text-decoration:none;color:inherit}
