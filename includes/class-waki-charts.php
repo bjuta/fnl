@@ -2365,7 +2365,6 @@ endif; ?>
               <table class="widefat striped">
                 <tbody>
                   <tr><th>Countries</th><td><input type="text" name="meta_countries" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['countries'] ?? [])); ?>"></td></tr>
-                  <tr><th>Region</th><td><input type="text" name="meta_region" class="regular-text" value="<?php echo esc_attr($report['parsed_meta']['region'] ?? ''); ?>"></td></tr>
                   <tr><th>Genres</th><td><input type="text" name="meta_genres" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['genres'] ?? [])); ?>"></td></tr>
                   <tr><th>Languages</th><td><input type="text" name="meta_languages" class="regular-text" value="<?php echo esc_attr(implode(', ', $report['parsed_meta']['languages'] ?? [])); ?>"></td></tr>
                   <tr><th>Format</th><td><input type="text" name="meta_format" class="regular-text" value="<?php echo esc_attr($report['parsed_meta']['format'] ?? ''); ?>"></td></tr>
@@ -4120,7 +4119,7 @@ endif; ?>
     }
 
     private function default_archive_intro(){
-        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by region and genre, and more.', 'wakilisha-charts');
+        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by genre and more.', 'wakilisha-charts');
     }
 
     public function register_rest_routes(){

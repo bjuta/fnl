@@ -301,7 +301,7 @@ msgstr ""
 #: templates/charts-archive.php:5
 msgid ""
 "From club heaters to quiet stunners, this is a living record of Kenyan "
-"music, tracked weekly, filtered by region and genre, and more."
+"music, tracked weekly, filtered by genre and more."
 msgstr ""
 
 #: templates/charts-archive.php:13
@@ -313,10 +313,6 @@ msgstr ""
 msgid "Updated %s"
 msgstr ""
 
-#: templates/charts-archive.php:45
-#, php-format
-msgid "Region: %s"
-msgstr ""
 
 #: templates/charts-archive.php:46
 #, php-format
