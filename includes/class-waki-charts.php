@@ -78,6 +78,7 @@ final class Waki_Charts {
         add_filter('template_include',      [$this,'load_artist_template']);
         add_filter('template_include',      [$this,'load_taxonomy_templates']);
         add_filter('template_include',      [$this,'load_chart_archive_template']);
+        add_filter('template_include',      [$this,'load_chart_single_template']);
 
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_keys_meta_box']);
         add_action('add_meta_boxes_' . self::CPT, [$this,'add_chart_dates_meta_box']);
@@ -1056,6 +1057,19 @@ final class Waki_Charts {
             } else {
                 $file = WAKI_CHARTS_DIR . 'templates/archive-' . self::CPT . '.php';
             }
+            if (file_exists($file)) {
+                return $file;
+            }
+        }
+        return $template;
+    }
+
+    public function load_chart_single_template($template){
+        if (
+            is_singular(self::CPT) ||
+            (is_404() && get_query_var('waki_chart_format') && get_query_var('waki_chart_date'))
+        ) {
+            $file = WAKI_CHARTS_DIR . 'templates/single-' . self::CPT . '.php';
             if (file_exists($file)) {
                 return $file;
             }
