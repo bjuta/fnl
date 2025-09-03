@@ -4108,10 +4108,6 @@ endif; ?>
         ];
     }
 
-    private function default_archive_intro(){
-        return __('From club heaters to quiet stunners, this is a living record of Kenyan music, tracked weekly, filtered by genre, and more.', 'wakilisha-charts');
-    }
-
     public function register_rest_routes(){
         register_rest_route('wakicharts/v1', '/archive-intro', [
             [
