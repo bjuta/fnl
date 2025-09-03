@@ -21,6 +21,8 @@ final class Waki_Charts {
     private $table;
     private $artist_table;
     private $resolved_chart = null;
+    private $calendar_cache = [];
+
 
     public static function instance(){ return self::$instance ?: (self::$instance = new self()); }
 
@@ -243,6 +245,26 @@ final class Waki_Charts {
         }
     }
 
+    private function migrate_postmeta_indexes(){
+        if (get_option(self::SLUG . "_pm_idx_done")) return;
+        global $wpdb;
+        require_once ABSPATH . "wp-admin/includes/upgrade.php";
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE {$wpdb->postmeta} (
+            meta_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            post_id bigint(20) unsigned NOT NULL DEFAULT '0',
+            meta_key varchar(255) DEFAULT NULL,
+            meta_value longtext,
+            PRIMARY KEY  (meta_id),
+            KEY post_id (post_id),
+            KEY meta_key (meta_key(191)),
+            KEY idx_waki_week_start (meta_key, meta_value(10)),
+            KEY idx_waki_year (meta_key, meta_value(4))
+        ) $charset_collate;";
+        dbDelta($sql);
+        update_option(self::SLUG . "_pm_idx_done", 1);
+    }
+
     public function maybe_upgrade(){
         // Backfill tables/columns if needed; also ensure archive page exists
         global $wpdb;
@@ -327,14 +349,7 @@ final class Waki_Charts {
         }
 
         // ensure postmeta indexes for chart queries
-        $pm_idx = $wpdb->get_results("SHOW INDEX FROM {$wpdb->postmeta}", ARRAY_A);
-        $pm_names = $pm_idx ? array_unique(wp_list_pluck($pm_idx,'Key_name')) : [];
-        if (!in_array('idx_waki_week_start',$pm_names,true)){
-            $wpdb->query("ALTER TABLE {$wpdb->postmeta} ADD KEY idx_waki_week_start (meta_key, meta_value(10))");
-        }
-        if (!in_array('idx_waki_year',$pm_names,true)){
-            $wpdb->query("ALTER TABLE {$wpdb->postmeta} ADD KEY idx_waki_year (meta_key, meta_value(4))");
-        }
+        $this->migrate_postmeta_indexes();
 
         // initial artist backfill from existing rows (once)
         if (!get_option(self::SLUG.'_artists_seeded')){
@@ -3666,9 +3681,16 @@ endif; ?>
     public function get_calendar_html($format, $year = null){
         $format = sanitize_title($format ?: 'default');
         $year   = intval($year ?: date('Y'));
-        $cache_key = 'waki_cal_' . $format . '_' . $year;
+        $memo_key = $format . '_' . $year;
+        if (isset($this->calendar_cache[$memo_key])) {
+            return $this->calendar_cache[$memo_key];
+        }
+        $cache_key = 'waki_cal_' . $memo_key;
         $html = get_transient($cache_key);
-        if ($html !== false) return $html;
+        if ($html !== false) {
+            $this->calendar_cache[$memo_key] = $html;
+            return $html;
+        }
 
         global $wpdb;
         $weeks = $wpdb->get_col(
@@ -3694,9 +3716,11 @@ endif; ?>
         $year_num = $year;
         include WAKI_CHARTS_DIR . 'templates/calendar.php';
         $html = ob_get_clean();
-        set_transient($cache_key, $html, DAY_IN_SECONDS * 7);
+        set_transient($cache_key, $html, WEEK_IN_SECONDS);
+        $this->calendar_cache[$memo_key] = $html;
         return $html;
     }
+
 
     public function force_single_content($content){
         if (is_singular(self::CPT)){
