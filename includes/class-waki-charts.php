@@ -1011,7 +1011,12 @@ final class Waki_Charts {
 
     public function load_chart_archive_template($template){
         if (is_post_type_archive(self::CPT)) {
-            $file = WAKI_CHARTS_DIR . 'templates/archive-' . self::CPT . '.php';
+            $format = get_query_var('waki_chart_format');
+            if ($format) {
+                $file = WAKI_CHARTS_DIR . 'templates/hub-format.php';
+            } else {
+                $file = WAKI_CHARTS_DIR . 'templates/archive-' . self::CPT . '.php';
+            }
             if (file_exists($file)) {
                 return $file;
             }
@@ -1025,6 +1030,7 @@ final class Waki_Charts {
         wp_register_style(self::SLUG, $base . 'assets/css/wakilisha-charts.css', [], self::VER);
         wp_register_script(self::SLUG, $base . 'assets/js/wakilisha-charts.js', [], self::VER, true);
         wp_register_script(self::SLUG . '-charts', $base . 'assets/js/charts.js', [], self::VER, true);
+        wp_register_script(self::SLUG . '-calendar', $base . 'assets/js/calendar.js', [], self::VER, true);
     }
 
     public function maybe_enqueue_assets(){
@@ -1045,6 +1051,7 @@ final class Waki_Charts {
         if ($enqueue){
             wp_enqueue_style(self::SLUG);
             wp_enqueue_script(self::SLUG);
+            wp_enqueue_script(self::SLUG . '-calendar');
         }
     }
 
@@ -3596,6 +3603,41 @@ endif; ?>
         return ltrim(ob_get_clean());
     }
 
+    public function get_calendar_html($format, $year = null){
+        $format = sanitize_title($format ?: 'default');
+        $year   = intval($year ?: date('Y'));
+        $cache_key = 'waki_cal_' . $format . '_' . $year;
+        $html = get_transient($cache_key);
+        if ($html !== false) return $html;
+
+        global $wpdb;
+        $weeks = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT pm.meta_value FROM {$wpdb->postmeta} pm
+                 INNER JOIN {$wpdb->postmeta} pf ON pm.post_id = pf.post_id
+                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                 WHERE pm.meta_key = '_waki_week_start'
+                   AND pf.meta_key = '_waki_format'
+                   AND pf.meta_value = %s
+                   AND p.post_type = %s AND p.post_status='publish'
+                   AND pm.meta_value BETWEEN %s AND %s",
+                $format,
+                self::CPT,
+                $year . '-01-01',
+                $year . '-12-31'
+            )
+        );
+        $week_lookup = array_flip($weeks ?: []);
+
+        ob_start();
+        $format_slug = $format;
+        $year_num = $year;
+        include WAKI_CHARTS_DIR . 'templates/calendar.php';
+        $html = ob_get_clean();
+        set_transient($cache_key, $html, DAY_IN_SECONDS * 7);
+        return $html;
+    }
+
     public function force_single_content($content){
         if (is_singular(self::CPT)){
             $post_id = get_the_ID();
@@ -3604,7 +3646,10 @@ endif; ?>
             $sid  = get_post_meta($post_id,'_waki_snapshot_id',true);
             if($key && $date){
                 $sc = '[waki_chart chart_key="'.esc_attr($key).'" chart_date="'.esc_attr($date).'" snapshot_id="'.esc_attr($sid).'" fullwidth="1" show_title="1" history="3" title="'.esc_attr(get_the_title($post_id)).'"]';
-                return $sc;
+                $format = get_post_meta($post_id, '_waki_format', true);
+                $cal_year = intval(substr($date,0,4));
+                $calendar = $this->get_calendar_html($format, $cal_year);
+                return $sc . $calendar;
             }
         }
         return $content;

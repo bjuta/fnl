@@ -79,3 +79,13 @@ function waki_chart_breadcrumbs($post = null){
 
     echo '<nav class="waki-breadcrumbs">' . implode(' &rsaquo; ', $parts) . '</nav>';
 }
+
+/**
+ * Output calendar navigation for a chart format and year.
+ *
+ * @param string $format Format slug.
+ * @param int|null $year Year number, defaults to current.
+ */
+function waki_chart_calendar($format, $year = null){
+    echo Waki_Charts::instance()->get_calendar_html($format, $year);
+}
